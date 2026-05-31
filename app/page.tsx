@@ -84,23 +84,37 @@ export default function Home() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{
-            background: 'linear-gradient(135deg, #cc0000, #ffcc00)',
-            borderRadius: '10px',
+            background: '#0f2318',
+            border: '2px solid #22c55e44',
+            borderRadius: '12px',
             width: '42px',
             height: '42px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.4rem'
+            fontSize: '1.4rem',
+            flexShrink: 0,
+            position: 'relative'
           }}>
             🌍
+            <div style={{
+              position: 'absolute',
+              top: '-3px',
+              right: '-3px',
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: '#22c55e',
+              border: '2px solid #060f1e'
+            }}/>
           </div>
           <div>
-            <h1 style={{ color: '#fff', fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>
-              Angola Monitor Ambiental
+            <h1 style={{ color: '#fff', fontSize: '1rem', fontWeight: '700', margin: 0, lineHeight: '1.3' }}>
+              Plataforma Inteligente de Monitoramento
+              <span style={{ color: '#22c55e' }}> Preventivo Ambiental com IoT e IA</span>
             </h1>
-            <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>
-              Sistema Inteligente de Monitoramento Preventivo
+            <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0 }}>
+              Sistema Inteligente de Monitoramento Preventivo — Angola
             </p>
           </div>
         </div>
@@ -210,7 +224,6 @@ export default function Home() {
           {/* PAINEL LATERAL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-            {/* PROVINCIA SELECCIONADA */}
             {selectedProvince && w ? (
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a, #1e293b)',
@@ -258,14 +271,14 @@ export default function Home() {
                 </div>
 
                 <button
-                onClick={() => {
+                  onClick={() => {
                     const slug = selectedProvince
                       .toLowerCase()
                       .normalize('NFD')
                       .replace(/[\u0300-\u036f]/g, '')
                       .replace(/ /g, '-')
                     window.location.href = `/provincia/${slug}`
-               }}
+                  }}
                   style={{
                     width: '100%',
                     background: 'linear-gradient(135deg, #22c55e, #16a34a)',
