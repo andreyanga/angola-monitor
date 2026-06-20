@@ -68,6 +68,13 @@ interface SensorReading {
   recorded_at: string
 }
 
+interface Report {
+  id: number
+  content: string
+  risk_score: number
+  generated_at: string
+}
+
 export default function ProvinciaPage() {
   const { slug } = useParams()
   const [province, setProvince] = useState<Province | null>(null)
@@ -75,6 +82,8 @@ export default function ProvinciaPage() {
   const [history, setHistory] = useState<WeatherData[]>([])
   const [municipalities, setMunicipalities] = useState<Municipality[]>([])
   const [loading, setLoading] = useState(true)
+  const [report, setReport] = useState<Report | null>(null)
+  const [generatingReport, setGeneratingReport] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -140,10 +149,49 @@ export default function ProvinciaPage() {
         setMunicipalities(munWithReadings)
       }
 
+      // Buscar último relatório de IA já gerado para esta província
+      const { data: lastReport } = await supabase
+        .from('reports')
+        .select('*')
+        .eq('province_id', prov.id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (lastReport) setReport(lastReport)
+
       setLoading(false)
     }
     fetchData()
   }, [slug])
+
+  async function gerarRelatorio() {
+    if (!province || !weather) return
+    setGeneratingReport(true)
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provinceId: province.id,
+          provinceName: province.name,
+          temperature: weather.temperature,
+          humidity: weather.humidity,
+          windSpeed: weather.wind_speed,
+          description: weather.description,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setReport(data.report)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+
+    setGeneratingReport(false)
+  }
 
   if (loading) return (
     <div style={{ background: '#060f1e', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -167,6 +215,18 @@ export default function ProvinciaPage() {
     if (d < 248) return 'Sudoeste'
     if (d < 293) return 'Oeste'
     return 'Noroeste'
+  }
+
+  const getRiskColor = (score: number) => {
+    if (score >= 70) return '#ef4444'
+    if (score >= 40) return '#eab308'
+    return '#22c55e'
+  }
+
+  const getRiskLabel = (score: number) => {
+    if (score >= 70) return 'Risco Elevado'
+    if (score >= 40) return 'Atenção'
+    return 'Normal'
   }
 
   return (
@@ -316,6 +376,71 @@ export default function ProvinciaPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* RELATÓRIO DE IA */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+          border: '1px solid #3b82f644',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          marginBottom: '1.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: 0 }}>
+              🤖 Relatório Inteligente (IA)
+            </h2>
+            <button
+              onClick={gerarRelatorio}
+              disabled={generatingReport || !weather}
+              style={{
+                background: generatingReport ? '#334155' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                color: '#fff',
+                padding: '0.5rem 1.2rem',
+                borderRadius: '8px',
+                border: 'none',
+                fontWeight: '600',
+                fontSize: '0.8rem',
+                cursor: generatingReport ? 'default' : 'pointer',
+              }}
+            >
+              {generatingReport ? 'A gerar análise...' : report ? 'Gerar Novo Relatório' : 'Gerar Relatório'}
+            </button>
+          </div>
+
+          {report ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1rem' }}>
+                <div style={{
+                  background: `${getRiskColor(report.risk_score)}22`,
+                  border: `1px solid ${getRiskColor(report.risk_score)}55`,
+                  borderRadius: '20px',
+                  padding: '0.3rem 0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: getRiskColor(report.risk_score) }} />
+                  <span style={{ color: getRiskColor(report.risk_score), fontSize: '0.75rem', fontWeight: '700' }}>
+                    {getRiskLabel(report.risk_score)} ({report.risk_score}/100)
+                  </span>
+                </div>
+                <span style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                  Gerado em {new Date(report.generated_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: '1.6', margin: 0 }}>
+                {report.content}
+              </p>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '1.5rem', color: '#475569' }}>
+              <p style={{ fontSize: '1.8rem', margin: '0 0 0.5rem 0' }}>🤖</p>
+              <p style={{ margin: 0, fontSize: '0.85rem' }}>
+                Ainda não foi gerado nenhum relatório de IA para esta província.
+              </p>
             </div>
           )}
         </div>
