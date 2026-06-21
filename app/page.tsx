@@ -29,6 +29,18 @@ interface RiskData {
   generated_at: string
 }
 
+interface Alert {
+  id: number
+  province_id: number
+  type: string
+  severity: string
+  title: string
+  description: string
+  is_active: boolean
+  created_at: string
+  provinces?: { name: string }
+}
+
 const normalize = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')
 
@@ -43,9 +55,11 @@ export default function Home() {
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null)
   const [weatherData, setWeatherData] = useState<WeatherData[]>([])
   const [riskData, setRiskData] = useState<RiskData[]>([])
+  const [alerts, setAlerts] = useState<Alert[]>([])
   const [currentTime, setCurrentTime] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [showCuandoCubangoChoice, setShowCuandoCubangoChoice] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
     function updateClock() {
@@ -88,12 +102,24 @@ export default function Home() {
       setRiskData(Object.values(latest))
     }
 
+    async function fetchAlerts() {
+      const { data } = await supabase
+        .from('alerts')
+        .select('*, provinces(name)')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+
+      setAlerts(data || [])
+    }
+
     fetchWeather()
     fetchRisk()
+    fetchAlerts()
 
     const interval = setInterval(() => {
       fetchWeather()
       fetchRisk()
+      fetchAlerts()
     }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
@@ -133,7 +159,6 @@ export default function Home() {
 
   const apiStatus = getApiStatus()
 
-  // Construir mapa de risco por nome de província normalizado, para passar ao AngolaMap
   const riskByProvinceName: Record<string, string> = {}
   weatherData.forEach((wd) => {
     if (!wd.provinces?.name) return
@@ -152,6 +177,12 @@ export default function Home() {
     if (score >= 30) return 'Risco — Atenção'
     return 'Risco — Normal'
   }
+
+  const severityColor = (severity: string) => severity === 'alerta' ? '#ef4444' : '#eab308'
+  const severityLabel = (severity: string) => severity === 'alerta' ? 'ALERTA' : 'ATENÇÃO'
+
+  const criticalAlerts = alerts.filter((a) => a.severity === 'alerta')
+  const attentionAlerts = alerts.filter((a) => a.severity === 'atencao')
 
   return (
     <main style={{ background: '#060f1e', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -219,6 +250,71 @@ export default function Home() {
         </div>
       </header>
 
+      {/* BANNER DE ALERTAS */}
+      {alerts.length > 0 && !bannerDismissed && (
+        <div style={{
+          background: criticalAlerts.length > 0
+            ? 'linear-gradient(90deg, #7f1d1d, #991b1b)'
+            : 'linear-gradient(90deg, #78350f, #92400e)',
+          borderBottom: `2px solid ${criticalAlerts.length > 0 ? '#ef4444' : '#eab308'}`,
+          padding: '0.8rem 2rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', flex: 1 }}>
+              <span style={{ fontSize: '1.4rem', animation: 'shake 1.5s infinite' }}>⚠️</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: '#fff', fontWeight: '700', fontSize: '0.85rem', margin: '0 0 0.4rem 0' }}>
+                  {criticalAlerts.length > 0
+                    ? `${criticalAlerts.length} província(s) em ALERTA — ${attentionAlerts.length} em atenção`
+                    : `${attentionAlerts.length} província(s) em Atenção`}
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      onClick={() => setSelectedProvince(alert.provinces?.name || '')}
+                      style={{
+                        background: 'rgba(0,0,0,0.25)',
+                        borderRadius: '8px',
+                        padding: '0.3rem 0.7rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <span style={{
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: severityColor(alert.severity)
+                      }} />
+                      <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: '600' }}>
+                        {alert.provinces?.name}
+                      </span>
+                      <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
+                        {alert.type}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255,255,255,0.6)',
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                lineHeight: 1
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ padding: '1.5rem 2rem' }}>
 
         {/* MAPA + PAINEL LATERAL */}
@@ -262,7 +358,6 @@ export default function Home() {
             </div>
             <AngolaMap onProvinceClick={handleProvinceClick} weatherData={weatherData} riskByProvinceName={riskByProvinceName} />
 
-            {/* MODAL DE ESCOLHA CUANDO/CUBANGO */}
             {showCuandoCubangoChoice && (
               <div style={{
                 position: 'absolute',
@@ -440,6 +535,63 @@ export default function Home() {
               </div>
             )}
 
+            {/* PAINEL FIXO DE ALERTAS */}
+            <div style={{
+              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+              border: `1px solid ${alerts.length > 0 ? '#ef444444' : '#1e3a5f'}`,
+              borderRadius: '16px',
+              padding: '1rem',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: alerts.length > 0 ? '0.8rem' : 0 }}>
+                <span>🚨</span>
+                <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
+                  Alertas Activos ({alerts.length})
+                </p>
+              </div>
+
+              {alerts.length === 0 ? (
+                <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>
+                  Nenhum alerta activo no momento. Todas as províncias monitoradas estão em condição normal.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto' }}>
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      onClick={() => setSelectedProvince(alert.provinces?.name || '')}
+                      style={{
+                        background: '#0f172a',
+                        border: `1px solid ${severityColor(alert.severity)}44`,
+                        borderRadius: '10px',
+                        padding: '0.6rem 0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.78rem' }}>{alert.provinces?.name}</span>
+                        <span style={{
+                          color: severityColor(alert.severity),
+                          fontSize: '0.65rem',
+                          fontWeight: '700',
+                          background: `${severityColor(alert.severity)}22`,
+                          padding: '0.1rem 0.5rem',
+                          borderRadius: '10px'
+                        }}>
+                          {severityLabel(alert.severity)}
+                        </span>
+                      </div>
+                      <p style={{ color: '#94a3b8', fontSize: '0.72rem', margin: '0 0 0.2rem 0' }}>
+                        ⚠️ {alert.type}
+                      </p>
+                      <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0, lineHeight: '1.4' }}>
+                        {alert.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* LISTA RAPIDA */}
             <div style={{
               background: 'linear-gradient(135deg, #0f172a, #1e293b)',
@@ -492,6 +644,14 @@ export default function Home() {
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
+        }
+        @keyframes shake {
+          0%, 100% { transform: rotate(0deg); }
+          10% { transform: rotate(-10deg); }
+          20% { transform: rotate(10deg); }
+          30% { transform: rotate(-6deg); }
+          40% { transform: rotate(6deg); }
+          50% { transform: rotate(0deg); }
         }
       `}</style>
     </main>
