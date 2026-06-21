@@ -19,17 +19,41 @@ interface WeatherData {
   humidity: number
   wind_speed: number
   description: string
+  recorded_at: string
   provinces?: { name: string }
+}
+
+interface RiskData {
+  province_id: number
+  risk_score: number
+  generated_at: string
+}
+
+const normalize = (str: string) =>
+  str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')
+
+function getRiskLevel(score: number | null) {
+  if (score === null) return 'normal'
+  if (score >= 60) return 'alerta'
+  if (score >= 30) return 'atencao'
+  return 'normal'
 }
 
 export default function Home() {
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null)
   const [weatherData, setWeatherData] = useState<WeatherData[]>([])
+  const [riskData, setRiskData] = useState<RiskData[]>([])
   const [currentTime, setCurrentTime] = useState('')
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [showCuandoCubangoChoice, setShowCuandoCubangoChoice] = useState(false)
 
   useEffect(() => {
-    const now = new Date()
-    setCurrentTime(now.toLocaleString('pt-AO', { dateStyle: 'full', timeStyle: 'short' }))
+    function updateClock() {
+      setCurrentTime(new Date().toLocaleString('pt-AO', { dateStyle: 'full', timeStyle: 'medium' }))
+    }
+    updateClock()
+    const interval = setInterval(updateClock, 1000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -43,32 +67,91 @@ export default function Home() {
       data?.forEach((item: WeatherData) => {
         if (!latest[item.province_id]) latest[item.province_id] = item
       })
-      setWeatherData(Object.values(latest))
+      const latestArray = Object.values(latest)
+      setWeatherData(latestArray)
+
+      if (data && data.length > 0) {
+        setLastUpdate(new Date(data[0].recorded_at))
+      }
     }
+
+    async function fetchRisk() {
+      const { data } = await supabase
+        .from('reports')
+        .select('province_id, risk_score, generated_at')
+        .order('generated_at', { ascending: false })
+
+      const latest: Record<number, RiskData> = {}
+      data?.forEach((item: RiskData) => {
+        if (!latest[item.province_id]) latest[item.province_id] = item
+      })
+      setRiskData(Object.values(latest))
+    }
+
     fetchWeather()
+    fetchRisk()
+
+    const interval = setInterval(() => {
+      fetchWeather()
+      fetchRisk()
+    }, 5 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
   const getProvinceWeather = (name: string) => {
-    return weatherData.find((w) => w.provinces?.name === name)
+    return weatherData.find((w) => w.provinces?.name && normalize(w.provinces.name) === normalize(name))
+  }
+
+  const getProvinceRisk = (provinceId: number) => {
+    const r = riskData.find((rd) => rd.province_id === provinceId)
+    return r ? r.risk_score : null
+  }
+
+  function handleProvinceClick(name: string) {
+    if (name === '__CUANDO_CUBANGO_CHOICE__') {
+      setShowCuandoCubangoChoice(true)
+      return
+    }
+    setSelectedProvince(name)
+  }
+
+  function chooseCuandoCubango(provinceName: string) {
+    setSelectedProvince(provinceName)
+    setShowCuandoCubangoChoice(false)
   }
 
   const w = selectedProvince ? getProvinceWeather(selectedProvince) : null
+  const selectedRisk = w ? getProvinceRisk(w.province_id) : null
 
-  const avgTemp = weatherData.length
-    ? (weatherData.reduce((sum, w) => sum + w.temperature, 0) / weatherData.length).toFixed(1)
-    : '--'
+  const getApiStatus = () => {
+    if (!lastUpdate) return { color: '#64748b', label: 'A verificar...', dot: '#64748b' }
+    const minutesAgo = (Date.now() - lastUpdate.getTime()) / 1000 / 60
+    if (minutesAgo <= 90) return { color: '#22c55e', label: 'Sistema Activo', dot: '#22c55e' }
+    if (minutesAgo <= 180) return { color: '#eab308', label: 'Dados Desactualizados', dot: '#eab308' }
+    return { color: '#ef4444', label: 'API Indisponível', dot: '#ef4444' }
+  }
 
-  const avgHumidity = weatherData.length
-    ? Math.round(weatherData.reduce((sum, w) => sum + w.humidity, 0) / weatherData.length)
-    : '--'
+  const apiStatus = getApiStatus()
 
-  const maxTemp = weatherData.length
-    ? Math.max(...weatherData.map((w) => w.temperature)).toFixed(1)
-    : '--'
+  // Construir mapa de risco por nome de província normalizado, para passar ao AngolaMap
+  const riskByProvinceName: Record<string, string> = {}
+  weatherData.forEach((wd) => {
+    if (!wd.provinces?.name) return
+    const score = getProvinceRisk(wd.province_id)
+    riskByProvinceName[normalize(wd.provinces.name)] = getRiskLevel(score)
+  })
 
-  const minTemp = weatherData.length
-    ? Math.min(...weatherData.map((w) => w.temperature)).toFixed(1)
-    : '--'
+  const getRiskColor = (score: number) => {
+    if (score >= 60) return '#ef4444'
+    if (score >= 30) return '#eab308'
+    return '#22c55e'
+  }
+
+  const getRiskLabel = (score: number) => {
+    if (score >= 60) return 'Risco — Alerta'
+    if (score >= 30) return 'Risco — Atenção'
+    return 'Risco — Normal'
+  }
 
   return (
     <main style={{ background: '#060f1e', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -104,7 +187,7 @@ export default function Home() {
               width: '10px',
               height: '10px',
               borderRadius: '50%',
-              background: '#22c55e',
+              background: apiStatus.dot,
               border: '2px solid #060f1e'
             }}/>
           </div>
@@ -120,8 +203,8 @@ export default function Home() {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{
-            background: '#22c55e22',
-            border: '1px solid #22c55e44',
+            background: `${apiStatus.color}22`,
+            border: `1px solid ${apiStatus.color}44`,
             borderRadius: '20px',
             padding: '0.3rem 0.8rem',
             display: 'inline-flex',
@@ -129,56 +212,14 @@ export default function Home() {
             gap: '0.4rem',
             marginBottom: '0.3rem'
           }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 2s infinite' }} />
-            <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: '600' }}>Sistema Activo</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: apiStatus.dot, animation: 'pulse 2s infinite' }} />
+            <span style={{ color: apiStatus.color, fontSize: '0.75rem', fontWeight: '600' }}>{apiStatus.label}</span>
           </div>
           <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0 }}>{currentTime}</p>
         </div>
       </header>
 
       <div style={{ padding: '1.5rem 2rem' }}>
-
-        {/* STATS CARDS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-          {[
-            { label: 'Províncias Monitoradas', value: `${weatherData.length}/21`, icon: '📍', color: '#3b82f6' },
-            { label: 'Temperatura Média', value: `${avgTemp}°C`, icon: '🌡️', color: '#f59e0b' },
-            { label: 'Temp. Máxima', value: `${maxTemp}°C`, icon: '🔥', color: '#ef4444' },
-            { label: 'Humidade Média', value: `${avgHumidity}%`, icon: '💧', color: '#06b6d4' },
-          ].map((card) => (
-            <div key={card.label} style={{
-              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-              border: `1px solid ${card.color}33`,
-              borderRadius: '12px',
-              padding: '1.2rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-            }}>
-              <div style={{
-                background: `${card.color}22`,
-                borderRadius: '10px',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.4rem',
-                flexShrink: 0
-              }}>
-                {card.icon}
-              </div>
-              <div>
-                <p style={{ color: '#64748b', fontSize: '0.7rem', margin: '0 0 0.2rem 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {card.label}
-                </p>
-                <p style={{ color: '#fff', fontSize: '1.4rem', fontWeight: '700', margin: 0 }}>
-                  {card.value}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* MAPA + PAINEL LATERAL */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
@@ -189,6 +230,7 @@ export default function Home() {
             border: '1px solid #1e3a5f',
             borderRadius: '16px',
             overflow: 'hidden',
+            position: 'relative'
           }}>
             <div style={{
               padding: '1rem 1.5rem',
@@ -218,7 +260,79 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <AngolaMap onProvinceClick={setSelectedProvince} weatherData={weatherData} />
+            <AngolaMap onProvinceClick={handleProvinceClick} weatherData={weatherData} riskByProvinceName={riskByProvinceName} />
+
+            {/* MODAL DE ESCOLHA CUANDO/CUBANGO */}
+            {showCuandoCubangoChoice && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(6,15,30,0.85)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+                  border: '1px solid #1e3a5f',
+                  borderRadius: '16px',
+                  padding: '1.5rem',
+                  width: '320px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ color: '#fff', fontWeight: '600', fontSize: '0.95rem', margin: '0 0 0.3rem 0' }}>
+                    Esta região foi dividida em 2025
+                  </p>
+                  <p style={{ color: '#64748b', fontSize: '0.75rem', margin: '0 0 1.2rem 0' }}>
+                    Qual província pretende consultar?
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    <button
+                      onClick={() => chooseCuandoCubango('Cuando')}
+                      style={{
+                        background: '#22c55e22',
+                        border: '1px solid #22c55e55',
+                        color: '#22c55e',
+                        padding: '0.7rem',
+                        borderRadius: '10px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cuando (Mavinga)
+                    </button>
+                    <button
+                      onClick={() => chooseCuandoCubango('Cubango')}
+                      style={{
+                        background: '#3b82f622',
+                        border: '1px solid #3b82f655',
+                        color: '#60a5fa',
+                        padding: '0.7rem',
+                        borderRadius: '10px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cubango (Menongue)
+                    </button>
+                    <button
+                      onClick={() => setShowCuandoCubangoChoice(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#64748b',
+                        padding: '0.4rem',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* PAINEL LATERAL */}
@@ -235,9 +349,20 @@ export default function Home() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <div>
                     <p style={{ color: '#64748b', fontSize: '0.7rem', margin: '0 0 0.2rem 0', textTransform: 'uppercase' }}>Província</p>
-                    <h3 style={{ color: '#22c55e', fontSize: '1.3rem', fontWeight: '700', margin: 0 }}>{selectedProvince}</h3>
+                    <h3 style={{ color: '#22c55e', fontSize: '1.3rem', fontWeight: '700', margin: 0 }}>{w.provinces?.name || selectedProvince}</h3>
                   </div>
-                  <div style={{ fontSize: '2rem' }}>📍</div>
+                  {selectedRisk !== null && (
+                    <div style={{
+                      background: `${getRiskColor(selectedRisk)}22`,
+                      border: `1px solid ${getRiskColor(selectedRisk)}55`,
+                      borderRadius: '20px',
+                      padding: '0.25rem 0.7rem',
+                    }}>
+                      <span style={{ color: getRiskColor(selectedRisk), fontSize: '0.7rem', fontWeight: '700' }}>
+                        {getRiskLabel(selectedRisk)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{
@@ -272,7 +397,8 @@ export default function Home() {
 
                 <button
                   onClick={() => {
-                    const slug = selectedProvince
+                    const realName = w.provinces?.name || selectedProvince
+                    const slug = realName!
                       .toLowerCase()
                       .normalize('NFD')
                       .replace(/[\u0300-\u036f]/g, '')
@@ -340,8 +466,8 @@ export default function Home() {
                         padding: '0.5rem 0.8rem',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        background: selectedProvince === item.provinces?.name ? '#22c55e22' : '#0f172a',
-                        border: selectedProvince === item.provinces?.name ? '1px solid #22c55e44' : '1px solid transparent',
+                        background: selectedProvince && normalize(selectedProvince) === normalize(item.provinces?.name || '') ? '#22c55e22' : '#0f172a',
+                        border: selectedProvince && normalize(selectedProvince) === normalize(item.provinces?.name || '') ? '1px solid #22c55e44' : '1px solid transparent',
                         transition: 'all 0.2s'
                       }}
                     >
@@ -361,7 +487,7 @@ export default function Home() {
           </div>
         </div>
       </div>
-      
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }

@@ -11,7 +11,10 @@ const riskColors = {
   alerta: '#ef4444',
 }
 
-export default function AngolaMap({ onProvinceClick, weatherData }) {
+const normalize = (str) =>
+  str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')
+
+export default function AngolaMap({ onProvinceClick, weatherData, riskByProvinceName }) {
   const [geoData, setGeoData] = useState(null)
 
   useEffect(() => {
@@ -20,13 +23,17 @@ export default function AngolaMap({ onProvinceClick, weatherData }) {
       .then((data) => setGeoData(data))
   }, [])
 
-  const styleFeature = () => ({
-    fillColor: riskColors.normal,
-    weight: 1.5,
-    opacity: 1,
-    color: '#fff',
-    fillOpacity: 0.7,
-  })
+  const styleFeature = (feature) => {
+    const name = feature.properties.NAME_1
+    const risk = riskByProvinceName?.[normalize(name)] || 'normal'
+    return {
+      fillColor: riskColors[risk],
+      weight: 1.5,
+      opacity: 1,
+      color: '#fff',
+      fillOpacity: 0.7,
+    }
+  }
 
   const onEachFeature = (feature, layer) => {
     const name = feature.properties.NAME_1
@@ -45,6 +52,10 @@ export default function AngolaMap({ onProvinceClick, weatherData }) {
         e.target.setStyle({ fillOpacity: 0.7, weight: 1.5 })
       },
       click: () => {
+        if (name === 'CuandoCubango' || name === 'Cuando Cubango') {
+          if (onProvinceClick) onProvinceClick('__CUANDO_CUBANGO_CHOICE__')
+          return
+        }
         if (onProvinceClick) onProvinceClick(name)
       },
     })
@@ -63,6 +74,7 @@ export default function AngolaMap({ onProvinceClick, weatherData }) {
       />
       {geoData && (
         <GeoJSON
+          key={JSON.stringify(riskByProvinceName)}
           data={geoData}
           style={styleFeature}
           onEachFeature={onEachFeature}
