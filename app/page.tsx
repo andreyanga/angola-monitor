@@ -41,6 +41,19 @@ interface Alert {
   provinces?: { name: string }
 }
 
+interface Sensor {
+  id: number
+  name: string
+  is_active: boolean
+  sensor_type: string
+  latitude: number
+  longitude: number
+  zona: string
+  municipio: string
+  provincia: string
+  has_alert?: boolean
+}
+
 const normalize = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')
 
@@ -56,6 +69,8 @@ export default function Home() {
   const [weatherData, setWeatherData] = useState<WeatherData[]>([])
   const [riskData, setRiskData] = useState<RiskData[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
+  const [sensors, setSensors] = useState<Sensor[]>([])
+  const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null)
   const [currentTime, setCurrentTime] = useState('')
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [showCuandoCubangoChoice, setShowCuandoCubangoChoice] = useState(false)
@@ -107,14 +122,44 @@ export default function Home() {
       setAlerts(data || [])
     }
 
+    async function fetchSensors() {
+      const { data } = await supabase
+        .from('sensors')
+        .select(`
+          id, name, is_active, sensor_type,
+          zones (name, latitude, longitude),
+          municipalities (name),
+          provinces (name)
+        `)
+
+      const alertProvinces = alerts.map((a) => a.provinces?.name)
+
+      const mapped = (data || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        is_active: s.is_active,
+        sensor_type: s.sensor_type,
+        latitude: s.zones?.latitude,
+        longitude: s.zones?.longitude,
+        zona: s.zones?.name,
+        municipio: s.municipalities?.name,
+        provincia: s.provinces?.name,
+        has_alert: alertProvinces.includes(s.provinces?.name),
+      }))
+
+      setSensors(mapped.filter((s: Sensor) => s.latitude && s.longitude))
+    }
+
     fetchWeather()
     fetchRisk()
     fetchAlerts()
+    fetchSensors()
 
     const interval = setInterval(() => {
       fetchWeather()
       fetchRisk()
       fetchAlerts()
+      fetchSensors()
     }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
@@ -129,6 +174,7 @@ export default function Home() {
 
   function handleProvinceClick(name: string) {
     if (name === '__CUANDO_CUBANGO_CHOICE__') { setShowCuandoCubangoChoice(true); return }
+    setSelectedSensor(null)
     setSelectedProvince(name)
   }
 
@@ -158,14 +204,15 @@ export default function Home() {
   })
 
   const getRiskColor = (score: number) => score >= 60 ? '#ef4444' : score >= 30 ? '#eab308' : '#22c55e'
-  const getRiskLabel = (score: number) => score >= 60 ? 'Risco — Alerta' : score >= 30 ? 'Risco — Atenção' : 'Risco — Normal'
+  const getIraLabel = (score: number) => score >= 60 ? 'ALTO' : score >= 30 ? 'MODERADO' : 'BAIXO'
+  const getIraColor = (score: number) => score >= 60 ? '#ef4444' : score >= 30 ? '#eab308' : '#22c55e'
+  const getIraBg = (score: number) => score >= 60 ? '#7f1d1d' : score >= 30 ? '#78350f' : '#14532d'
   const severityColor = (s: string) => s === 'alerta' ? '#ef4444' : '#eab308'
   const severityLabel = (s: string) => s === 'alerta' ? 'ALERTA' : 'ATENÇÃO'
 
   const criticalAlerts = alerts.filter((a) => a.severity === 'alerta')
   const attentionAlerts = alerts.filter((a) => a.severity === 'atencao')
 
-  // IRA global de Angola
   const scores = riskData.map((r) => r.risk_score)
   const iraMedia = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
   const iraMax = scores.length > 0 ? Math.max(...scores) : null
@@ -173,9 +220,8 @@ export default function Home() {
     ? weatherData.find((wd) => getProvinceRisk(wd.province_id) === iraMax)?.provinces?.name
     : null
 
-  const getIraLabel = (score: number) => score >= 60 ? 'ALTO' : score >= 30 ? 'MODERADO' : 'BAIXO'
-  const getIraColor = (score: number) => score >= 60 ? '#ef4444' : score >= 30 ? '#eab308' : '#22c55e'
-  const getIraBg = (score: number) => score >= 60 ? '#7f1d1d' : score >= 30 ? '#78350f' : '#14532d'
+  const activeSensors = sensors.filter((s) => s.is_active)
+  const inactiveSensors = sensors.filter((s) => !s.is_active)
 
   return (
     <main style={{ background: '#060f1e', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -263,19 +309,10 @@ export default function Home() {
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   {alerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      onClick={() => setSelectedProvince(alert.provinces?.name || '')}
-                      style={{
-                        background: 'rgba(0,0,0,0.25)',
-                        borderRadius: '8px',
-                        padding: '0.3rem 0.7rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                      }}
-                    >
+                    <div key={alert.id} onClick={() => setSelectedProvince(alert.provinces?.name || '')} style={{
+                      background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.3rem 0.7rem',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: severityColor(alert.severity) }} />
                       <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: '600' }}>{alert.provinces?.name}</span>
                       <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{alert.type}</span>
@@ -292,7 +329,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* IRA — ÍNDICE DE RISCO AMBIENTAL */}
+      {/* IRA */}
       {iraMedia !== null && (
         <div style={{
           background: 'linear-gradient(135deg, #0f172a, #1a2744)',
@@ -302,31 +339,16 @@ export default function Home() {
           alignItems: 'center',
           gap: '2rem',
         }}>
-          {/* IRA médio Angola */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.2rem 0' }}>
-                IRA — Angola
-              </p>
+              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.2rem 0' }}>IRA — Angola</p>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
-                <span style={{ color: getIraColor(iraMedia), fontSize: '2rem', fontWeight: '800', lineHeight: 1 }}>
-                  {iraMedia}%
-                </span>
-                <span style={{
-                  background: getIraBg(iraMedia),
-                  color: getIraColor(iraMedia),
-                  fontSize: '0.7rem',
-                  fontWeight: '700',
-                  padding: '0.15rem 0.5rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${getIraColor(iraMedia)}55`,
-                }}>
+                <span style={{ color: getIraColor(iraMedia), fontSize: '2rem', fontWeight: '800', lineHeight: 1 }}>{iraMedia}%</span>
+                <span style={{ background: getIraBg(iraMedia), color: getIraColor(iraMedia), fontSize: '0.7rem', fontWeight: '700', padding: '0.15rem 0.5rem', borderRadius: '6px', border: `1px solid ${getIraColor(iraMedia)}55` }}>
                   {getIraLabel(iraMedia)}
                 </span>
               </div>
             </div>
-
-            {/* Barra de progresso do IRA */}
             <div style={{ width: '180px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
                 <span style={{ color: '#22c55e', fontSize: '0.6rem' }}>BAIXO</span>
@@ -334,54 +356,28 @@ export default function Home() {
                 <span style={{ color: '#ef4444', fontSize: '0.6rem' }}>ALTO</span>
               </div>
               <div style={{ background: '#1e293b', borderRadius: '6px', height: '8px', overflow: 'hidden', position: 'relative' }}>
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'linear-gradient(90deg, #22c55e 0%, #eab308 50%, #ef4444 100%)',
-                  opacity: 0.3
-                }} />
-                <div style={{
-                  width: `${iraMedia}%`,
-                  height: '100%',
-                  background: getIraColor(iraMedia),
-                  borderRadius: '6px',
-                  transition: 'width 0.5s ease',
-                  position: 'relative',
-                  zIndex: 1
-                }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, #22c55e 0%, #eab308 50%, #ef4444 100%)', opacity: 0.3 }} />
+                <div style={{ width: `${iraMedia}%`, height: '100%', background: getIraColor(iraMedia), borderRadius: '6px', transition: 'width 0.5s ease', position: 'relative', zIndex: 1 }} />
               </div>
             </div>
           </div>
 
-          {/* Separador */}
           <div style={{ width: '1px', height: '40px', background: '#1e3a5f' }} />
 
-          {/* Pior província */}
           {iraMax !== null && iraMax > 0 && (
             <div>
-              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.2rem 0' }}>
-                Maior Risco
-              </p>
+              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.2rem 0' }}>Maior Risco</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.9rem' }}>{iraMaxProvince}</span>
-                <span style={{
-                  background: getIraBg(iraMax),
-                  color: getIraColor(iraMax),
-                  fontSize: '0.65rem',
-                  fontWeight: '700',
-                  padding: '0.15rem 0.5rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${getIraColor(iraMax)}55`,
-                }}>
+                <span style={{ background: getIraBg(iraMax), color: getIraColor(iraMax), fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.5rem', borderRadius: '6px', border: `1px solid ${getIraColor(iraMax)}55` }}>
                   {iraMax}% — {getIraLabel(iraMax)}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Separador */}
           <div style={{ width: '1px', height: '40px', background: '#1e3a5f' }} />
 
-          {/* Contagem por nível */}
           <div style={{ display: 'flex', gap: '1.2rem' }}>
             {[
               { label: 'Normal', color: '#22c55e', count: riskData.filter(r => r.risk_score < 30).length },
@@ -395,6 +391,25 @@ export default function Home() {
             ))}
           </div>
 
+          <div style={{ width: '1px', height: '40px', background: '#1e3a5f' }} />
+
+          {/* Contagem de centrais */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div>
+              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>Centrais</p>
+              <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                  <span style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: '700' }}>{activeSensors.length} Activas</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#64748b' }} />
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{inactiveSensors.length} Inactivas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div style={{ marginLeft: 'auto' }}>
             <p style={{ color: '#475569', fontSize: '0.65rem', margin: 0 }}>
               Baseado em: Chuva (30%) · Humidade (20%) · Vento (20%) · Temperatura (15%) · Vibração (10%) · Ar (5%)
@@ -404,8 +419,6 @@ export default function Home() {
       )}
 
       <div style={{ padding: '1.5rem 2rem' }}>
-
-        {/* MAPA + PAINEL LATERAL */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
 
           {/* MAPA */}
@@ -425,9 +438,9 @@ export default function Home() {
             }}>
               <div>
                 <h2 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>Mapa de Angola</h2>
-                <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>Clica numa província para ver os dados</p>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>Clica numa província ou central para ver os dados</p>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
                 {[
                   { label: 'Normal', color: '#22c55e' },
                   { label: 'Atenção', color: '#eab308' },
@@ -438,9 +451,27 @@ export default function Home() {
                     <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>{l.label}</span>
                   </div>
                 ))}
+                <div style={{ width: '1px', height: '16px', background: '#1e3a5f' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e', border: '2px solid #fff' }} />
+                  <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>CML Activa</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#64748b', border: '2px solid #fff' }} />
+                  <span style={{ color: '#94a3b8', fontSize: '0.7rem' }}>CML Inactiva</span>
+                </div>
               </div>
             </div>
-            <AngolaMap onProvinceClick={handleProvinceClick} weatherData={weatherData} riskByProvinceName={riskByProvinceName} />
+            <AngolaMap
+              onProvinceClick={handleProvinceClick}
+              weatherData={weatherData}
+              riskByProvinceName={riskByProvinceName}
+              sensors={sensors}
+              onSensorClick={(sensor: Sensor) => {
+                setSelectedSensor(sensor)
+                setSelectedProvince(null)
+              }}
+            />
 
             {showCuandoCubangoChoice && (
               <div style={{
@@ -474,7 +505,90 @@ export default function Home() {
           {/* PAINEL LATERAL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-            {selectedProvince && w ? (
+            {/* PAINEL DA CENTRAL SELECCIONADA */}
+            {selectedSensor && (
+              <div style={{
+                background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+                border: `1px solid ${selectedSensor.has_alert ? '#ef444444' : selectedSensor.is_active ? '#22c55e44' : '#33415544'}`,
+                borderRadius: '16px',
+                padding: '1.2rem',
+                color: '#fff',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
+                  <div>
+                    <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>Central de Monitoramento</p>
+                    <p style={{ color: '#fff', fontWeight: '700', fontSize: '0.95rem', margin: 0 }}>{selectedSensor.name}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: selectedSensor.has_alert ? '#ef4444' : selectedSensor.is_active ? '#22c55e' : '#64748b', animation: selectedSensor.is_active ? 'pulse 2s infinite' : 'none' }} />
+                    <span style={{ color: selectedSensor.has_alert ? '#ef4444' : selectedSensor.is_active ? '#22c55e' : '#64748b', fontSize: '0.7rem', fontWeight: '600' }}>
+                      {selectedSensor.has_alert ? 'Em Alerta' : selectedSensor.is_active ? 'Activa' : 'Inactiva'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.8rem' }}>
+                  {[
+                    { label: 'Zona', value: selectedSensor.zona },
+                    { label: 'Município', value: selectedSensor.municipio },
+                    { label: 'Província', value: selectedSensor.provincia },
+                    { label: 'Sensores', value: selectedSensor.sensor_type },
+                  ].map((item) => (
+                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.72rem' }}>{item.label}</span>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.72rem', fontWeight: '600' }}>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Painel de sensores */}
+                <div style={{ background: '#060f1e', borderRadius: '8px', padding: '0.7rem', marginBottom: '0.8rem' }}>
+                  <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.5rem 0' }}>Leituras dos Sensores</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {[
+                      { sensor: 'MQ-135', label: 'Qualidade do Ar', value: selectedSensor.is_active ? 'Sem dados' : '—', unit: 'ADC' },
+                      { sensor: 'SW-420', label: 'Vibração', value: selectedSensor.is_active ? 'Sem vibração' : '—', unit: '' },
+                    ].map((s) => (
+                      <div key={s.sensor} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '600' }}>{s.sensor}</span>
+                          <span style={{ color: '#475569', fontSize: '0.65rem', marginLeft: '0.3rem' }}>{s.label}</span>
+                        </div>
+                        <span style={{ color: selectedSensor.is_active ? '#22c55e' : '#475569', fontSize: '0.72rem', fontWeight: '600' }}>
+                          {s.value} {s.unit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => setSelectedProvince(selectedSensor.provincia)}
+                    style={{
+                      flex: 1, background: '#1e293b', border: '1px solid #334155',
+                      color: '#94a3b8', padding: '0.4rem', borderRadius: '8px',
+                      fontSize: '0.72rem', cursor: 'pointer'
+                    }}
+                  >
+                    Ver Província
+                  </button>
+                  <button
+                    onClick={() => setSelectedSensor(null)}
+                    style={{
+                      background: '#1e293b', border: '1px solid #334155',
+                      color: '#64748b', padding: '0.4rem 0.6rem', borderRadius: '8px',
+                      fontSize: '0.72rem', cursor: 'pointer'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* PAINEL DA PROVÍNCIA SELECCIONADA */}
+            {selectedProvince && w && !selectedSensor ? (
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                 border: '1px solid #22c55e44',
@@ -520,8 +634,7 @@ export default function Home() {
                     window.location.href = `/provincia/${slug}`
                   }}
                   style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                    width: '100%', background: 'linear-gradient(135deg, #22c55e, #16a34a)',
                     color: '#000', padding: '0.8rem', borderRadius: '10px',
                     border: 'none', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer',
                   }}
@@ -529,7 +642,7 @@ export default function Home() {
                   Ver Detalhes Completos
                 </button>
               </div>
-            ) : (
+            ) : !selectedSensor && (
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                 border: '1px solid #1e3a5f', borderRadius: '16px',
@@ -537,7 +650,7 @@ export default function Home() {
               }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
                 <h3 style={{ color: '#94a3b8', fontWeight: '600', fontSize: '0.95rem', margin: '0 0 0.5rem 0' }}>Nenhuma Província Seleccionada</h3>
-                <p style={{ color: '#475569', fontSize: '0.8rem', margin: 0 }}>Clica numa província no mapa para ver os dados meteorológicos em tempo real</p>
+                <p style={{ color: '#475569', fontSize: '0.8rem', margin: 0 }}>Clica numa província ou central no mapa para ver os dados</p>
               </div>
             )}
 
@@ -552,11 +665,9 @@ export default function Home() {
                 <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>Alertas Activos ({alerts.length})</p>
               </div>
               {alerts.length === 0 ? (
-                <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>
-                  Nenhum alerta activo. Todas as províncias em condição normal.
-                </p>
+                <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>Nenhum alerta activo. Todas as províncias em condição normal.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
                   {alerts.map((alert) => (
                     <div key={alert.id} onClick={() => setSelectedProvince(alert.provinces?.name || '')} style={{
                       background: '#0f172a', border: `1px solid ${severityColor(alert.severity)}44`,
@@ -576,43 +687,31 @@ export default function Home() {
               )}
             </div>
 
-            {/* LISTA RAPIDA */}
+            {/* IRA POR PROVÍNCIA */}
             <div style={{
               background: 'linear-gradient(135deg, #0f172a, #1e293b)',
               border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1rem', flex: 1, overflow: 'hidden'
             }}>
-              <p style={{ color: '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', margin: '0 0 0.8rem 0', letterSpacing: '0.05em' }}>
-                IRA por Província
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '300px', overflowY: 'auto' }}>
-                {riskData
-                  .sort((a, b) => b.risk_score - a.risk_score)
-                  .map((item) => {
-                    const provinceName = weatherData.find(w => w.province_id === item.province_id)?.provinces?.name
-                    return (
-                      <div
-                        key={item.province_id}
-                        onClick={() => provinceName && setSelectedProvince(provinceName)}
-                        style={{
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '0.5rem 0.8rem', borderRadius: '8px', cursor: 'pointer',
-                          background: selectedProvince && provinceName && normalize(selectedProvince) === normalize(provinceName) ? '#22c55e22' : '#0f172a',
-                          border: selectedProvince && provinceName && normalize(selectedProvince) === normalize(provinceName) ? '1px solid #22c55e44' : '1px solid transparent',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>{provinceName}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ color: getIraColor(item.risk_score), fontWeight: '700', fontSize: '0.85rem' }}>
-                            {item.risk_score}%
-                          </span>
-                          <span style={{ color: getIraColor(item.risk_score), fontSize: '0.65rem', fontWeight: '600' }}>
-                            {getIraLabel(item.risk_score)}
-                          </span>
-                        </div>
+              <p style={{ color: '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', margin: '0 0 0.8rem 0', letterSpacing: '0.05em' }}>IRA por Província</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '250px', overflowY: 'auto' }}>
+                {riskData.sort((a, b) => b.risk_score - a.risk_score).map((item) => {
+                  const provinceName = weatherData.find(w => w.province_id === item.province_id)?.provinces?.name
+                  return (
+                    <div key={item.province_id} onClick={() => provinceName && setSelectedProvince(provinceName)} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '0.5rem 0.8rem', borderRadius: '8px', cursor: 'pointer',
+                      background: selectedProvince && provinceName && normalize(selectedProvince) === normalize(provinceName) ? '#22c55e22' : '#0f172a',
+                      border: selectedProvince && provinceName && normalize(selectedProvince) === normalize(provinceName) ? '1px solid #22c55e44' : '1px solid transparent',
+                      transition: 'all 0.2s'
+                    }}>
+                      <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>{provinceName}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ color: getIraColor(item.risk_score), fontWeight: '700', fontSize: '0.85rem' }}>{item.risk_score}%</span>
+                        <span style={{ color: getIraColor(item.risk_score), fontSize: '0.65rem', fontWeight: '600' }}>{getIraLabel(item.risk_score)}</span>
                       </div>
-                    )
-                  })}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
