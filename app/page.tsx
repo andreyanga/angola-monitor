@@ -81,12 +81,8 @@ export default function Home() {
       data?.forEach((item: WeatherData) => {
         if (!latest[item.province_id]) latest[item.province_id] = item
       })
-      const latestArray = Object.values(latest)
-      setWeatherData(latestArray)
-
-      if (data && data.length > 0) {
-        setLastUpdate(new Date(data[0].recorded_at))
-      }
+      setWeatherData(Object.values(latest))
+      if (data && data.length > 0) setLastUpdate(new Date(data[0].recorded_at))
     }
 
     async function fetchRisk() {
@@ -108,7 +104,6 @@ export default function Home() {
         .select('*, provinces(name)')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-
       setAlerts(data || [])
     }
 
@@ -124,9 +119,8 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [])
 
-  const getProvinceWeather = (name: string) => {
-    return weatherData.find((w) => w.provinces?.name && normalize(w.provinces.name) === normalize(name))
-  }
+  const getProvinceWeather = (name: string) =>
+    weatherData.find((w) => w.provinces?.name && normalize(w.provinces.name) === normalize(name))
 
   const getProvinceRisk = (provinceId: number) => {
     const r = riskData.find((rd) => rd.province_id === provinceId)
@@ -134,10 +128,7 @@ export default function Home() {
   }
 
   function handleProvinceClick(name: string) {
-    if (name === '__CUANDO_CUBANGO_CHOICE__') {
-      setShowCuandoCubangoChoice(true)
-      return
-    }
+    if (name === '__CUANDO_CUBANGO_CHOICE__') { setShowCuandoCubangoChoice(true); return }
     setSelectedProvince(name)
   }
 
@@ -166,23 +157,25 @@ export default function Home() {
     riskByProvinceName[normalize(wd.provinces.name)] = getRiskLevel(score)
   })
 
-  const getRiskColor = (score: number) => {
-    if (score >= 60) return '#ef4444'
-    if (score >= 30) return '#eab308'
-    return '#22c55e'
-  }
-
-  const getRiskLabel = (score: number) => {
-    if (score >= 60) return 'Risco — Alerta'
-    if (score >= 30) return 'Risco — Atenção'
-    return 'Risco — Normal'
-  }
-
-  const severityColor = (severity: string) => severity === 'alerta' ? '#ef4444' : '#eab308'
-  const severityLabel = (severity: string) => severity === 'alerta' ? 'ALERTA' : 'ATENÇÃO'
+  const getRiskColor = (score: number) => score >= 60 ? '#ef4444' : score >= 30 ? '#eab308' : '#22c55e'
+  const getRiskLabel = (score: number) => score >= 60 ? 'Risco — Alerta' : score >= 30 ? 'Risco — Atenção' : 'Risco — Normal'
+  const severityColor = (s: string) => s === 'alerta' ? '#ef4444' : '#eab308'
+  const severityLabel = (s: string) => s === 'alerta' ? 'ALERTA' : 'ATENÇÃO'
 
   const criticalAlerts = alerts.filter((a) => a.severity === 'alerta')
   const attentionAlerts = alerts.filter((a) => a.severity === 'atencao')
+
+  // IRA global de Angola
+  const scores = riskData.map((r) => r.risk_score)
+  const iraMedia = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+  const iraMax = scores.length > 0 ? Math.max(...scores) : null
+  const iraMaxProvince = iraMax !== null
+    ? weatherData.find((wd) => getProvinceRisk(wd.province_id) === iraMax)?.provinces?.name
+    : null
+
+  const getIraLabel = (score: number) => score >= 60 ? 'ALTO' : score >= 30 ? 'MODERADO' : 'BAIXO'
+  const getIraColor = (score: number) => score >= 60 ? '#ef4444' : score >= 30 ? '#eab308' : '#22c55e'
+  const getIraBg = (score: number) => score >= 60 ? '#7f1d1d' : score >= 30 ? '#78350f' : '#14532d'
 
   return (
     <main style={{ background: '#060f1e', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -283,34 +276,129 @@ export default function Home() {
                         gap: '0.4rem',
                       }}
                     >
-                      <span style={{
-                        width: '6px', height: '6px', borderRadius: '50%',
-                        background: severityColor(alert.severity)
-                      }} />
-                      <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: '600' }}>
-                        {alert.provinces?.name}
-                      </span>
-                      <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
-                        {alert.type}
-                      </span>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: severityColor(alert.severity) }} />
+                      <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: '600' }}>{alert.provinces?.name}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{alert.type}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setBannerDismissed(true)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'rgba(255,255,255,0.6)',
-                fontSize: '1.1rem',
-                cursor: 'pointer',
-                lineHeight: 1
-              }}
-            >
-              ×
-            </button>
+            <button onClick={() => setBannerDismissed(true)} style={{
+              background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)',
+              fontSize: '1.1rem', cursor: 'pointer', lineHeight: 1
+            }}>×</button>
+          </div>
+        </div>
+      )}
+
+      {/* IRA — ÍNDICE DE RISCO AMBIENTAL */}
+      {iraMedia !== null && (
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a, #1a2744)',
+          borderBottom: '1px solid #1e3a5f',
+          padding: '0.8rem 2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2rem',
+        }}>
+          {/* IRA médio Angola */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.2rem 0' }}>
+                IRA — Angola
+              </p>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+                <span style={{ color: getIraColor(iraMedia), fontSize: '2rem', fontWeight: '800', lineHeight: 1 }}>
+                  {iraMedia}%
+                </span>
+                <span style={{
+                  background: getIraBg(iraMedia),
+                  color: getIraColor(iraMedia),
+                  fontSize: '0.7rem',
+                  fontWeight: '700',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${getIraColor(iraMedia)}55`,
+                }}>
+                  {getIraLabel(iraMedia)}
+                </span>
+              </div>
+            </div>
+
+            {/* Barra de progresso do IRA */}
+            <div style={{ width: '180px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                <span style={{ color: '#22c55e', fontSize: '0.6rem' }}>BAIXO</span>
+                <span style={{ color: '#eab308', fontSize: '0.6rem' }}>MODERADO</span>
+                <span style={{ color: '#ef4444', fontSize: '0.6rem' }}>ALTO</span>
+              </div>
+              <div style={{ background: '#1e293b', borderRadius: '6px', height: '8px', overflow: 'hidden', position: 'relative' }}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'linear-gradient(90deg, #22c55e 0%, #eab308 50%, #ef4444 100%)',
+                  opacity: 0.3
+                }} />
+                <div style={{
+                  width: `${iraMedia}%`,
+                  height: '100%',
+                  background: getIraColor(iraMedia),
+                  borderRadius: '6px',
+                  transition: 'width 0.5s ease',
+                  position: 'relative',
+                  zIndex: 1
+                }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Separador */}
+          <div style={{ width: '1px', height: '40px', background: '#1e3a5f' }} />
+
+          {/* Pior província */}
+          {iraMax !== null && iraMax > 0 && (
+            <div>
+              <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.2rem 0' }}>
+                Maior Risco
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.9rem' }}>{iraMaxProvince}</span>
+                <span style={{
+                  background: getIraBg(iraMax),
+                  color: getIraColor(iraMax),
+                  fontSize: '0.65rem',
+                  fontWeight: '700',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${getIraColor(iraMax)}55`,
+                }}>
+                  {iraMax}% — {getIraLabel(iraMax)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Separador */}
+          <div style={{ width: '1px', height: '40px', background: '#1e3a5f' }} />
+
+          {/* Contagem por nível */}
+          <div style={{ display: 'flex', gap: '1.2rem' }}>
+            {[
+              { label: 'Normal', color: '#22c55e', count: riskData.filter(r => r.risk_score < 30).length },
+              { label: 'Moderado', color: '#eab308', count: riskData.filter(r => r.risk_score >= 30 && r.risk_score < 60).length },
+              { label: 'Alto', color: '#ef4444', count: riskData.filter(r => r.risk_score >= 60).length },
+            ].map((item) => (
+              <div key={item.label} style={{ textAlign: 'center' }}>
+                <p style={{ color: item.color, fontSize: '1.3rem', fontWeight: '800', margin: 0 }}>{item.count}</p>
+                <p style={{ color: '#64748b', fontSize: '0.65rem', margin: 0 }}>{item.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginLeft: 'auto' }}>
+            <p style={{ color: '#475569', fontSize: '0.65rem', margin: 0 }}>
+              Baseado em: Chuva (30%) · Humidade (20%) · Vento (20%) · Temperatura (15%) · Vibração (10%) · Ar (5%)
+            </p>
           </div>
         </div>
       )}
@@ -336,12 +424,8 @@ export default function Home() {
               justifyContent: 'space-between'
             }}>
               <div>
-                <h2 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>
-                  Mapa de Angola
-                </h2>
-                <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>
-                  Clica numa província para ver os dados
-                </p>
+                <h2 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>Mapa de Angola</h2>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>Clica numa província para ver os dados</p>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {[
@@ -360,68 +444,25 @@ export default function Home() {
 
             {showCuandoCubangoChoice && (
               <div style={{
-                position: 'absolute',
-                inset: 0,
+                position: 'absolute', inset: 0,
                 background: 'rgba(6,15,30,0.85)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
               }}>
                 <div style={{
                   background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                   border: '1px solid #1e3a5f',
-                  borderRadius: '16px',
-                  padding: '1.5rem',
-                  width: '320px',
-                  textAlign: 'center'
+                  borderRadius: '16px', padding: '1.5rem', width: '320px', textAlign: 'center'
                 }}>
-                  <p style={{ color: '#fff', fontWeight: '600', fontSize: '0.95rem', margin: '0 0 0.3rem 0' }}>
-                    Esta região foi dividida em 2025
-                  </p>
-                  <p style={{ color: '#64748b', fontSize: '0.75rem', margin: '0 0 1.2rem 0' }}>
-                    Qual província pretende consultar?
-                  </p>
+                  <p style={{ color: '#fff', fontWeight: '600', fontSize: '0.95rem', margin: '0 0 0.3rem 0' }}>Esta região foi dividida em 2025</p>
+                  <p style={{ color: '#64748b', fontSize: '0.75rem', margin: '0 0 1.2rem 0' }}>Qual província pretende consultar?</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                    <button
-                      onClick={() => chooseCuandoCubango('Cuando')}
-                      style={{
-                        background: '#22c55e22',
-                        border: '1px solid #22c55e55',
-                        color: '#22c55e',
-                        padding: '0.7rem',
-                        borderRadius: '10px',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
+                    <button onClick={() => chooseCuandoCubango('Cuando')} style={{ background: '#22c55e22', border: '1px solid #22c55e55', color: '#22c55e', padding: '0.7rem', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}>
                       Cuando (Mavinga)
                     </button>
-                    <button
-                      onClick={() => chooseCuandoCubango('Cubango')}
-                      style={{
-                        background: '#3b82f622',
-                        border: '1px solid #3b82f655',
-                        color: '#60a5fa',
-                        padding: '0.7rem',
-                        borderRadius: '10px',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
+                    <button onClick={() => chooseCuandoCubango('Cubango')} style={{ background: '#3b82f622', border: '1px solid #3b82f655', color: '#60a5fa', padding: '0.7rem', borderRadius: '10px', fontWeight: '700', cursor: 'pointer' }}>
                       Cubango (Menongue)
                     </button>
-                    <button
-                      onClick={() => setShowCuandoCubangoChoice(false)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#64748b',
-                        padding: '0.4rem',
-                        fontSize: '0.8rem',
-                        cursor: 'pointer'
-                      }}
-                    >
+                    <button onClick={() => setShowCuandoCubangoChoice(false)} style={{ background: 'transparent', border: 'none', color: '#64748b', padding: '0.4rem', fontSize: '0.8rem', cursor: 'pointer' }}>
                       Cancelar
                     </button>
                   </div>
@@ -437,9 +478,7 @@ export default function Home() {
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                 border: '1px solid #22c55e44',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                color: '#fff',
+                borderRadius: '16px', padding: '1.5rem', color: '#fff',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <div>
@@ -447,26 +486,15 @@ export default function Home() {
                     <h3 style={{ color: '#22c55e', fontSize: '1.3rem', fontWeight: '700', margin: 0 }}>{w.provinces?.name || selectedProvince}</h3>
                   </div>
                   {selectedRisk !== null && (
-                    <div style={{
-                      background: `${getRiskColor(selectedRisk)}22`,
-                      border: `1px solid ${getRiskColor(selectedRisk)}55`,
-                      borderRadius: '20px',
-                      padding: '0.25rem 0.7rem',
-                    }}>
+                    <div style={{ background: `${getRiskColor(selectedRisk)}22`, border: `1px solid ${getRiskColor(selectedRisk)}55`, borderRadius: '20px', padding: '0.25rem 0.7rem' }}>
                       <span style={{ color: getRiskColor(selectedRisk), fontSize: '0.7rem', fontWeight: '700' }}>
-                        {getRiskLabel(selectedRisk)}
+                        IRA: {selectedRisk}% — {getIraLabel(selectedRisk)}
                       </span>
                     </div>
                   )}
                 </div>
 
-                <div style={{
-                  background: '#0f172a',
-                  borderRadius: '12px',
-                  padding: '1rem',
-                  marginBottom: '1rem',
-                  textAlign: 'center'
-                }}>
+                <div style={{ background: '#0f172a', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
                   <p style={{ color: '#64748b', fontSize: '0.7rem', margin: '0 0 0.3rem 0' }}>TEMPERATURA</p>
                   <p style={{ color: '#f59e0b', fontSize: '2.5rem', fontWeight: '800', margin: 0 }}>{w.temperature}°C</p>
                   <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.3rem 0 0 0', textTransform: 'capitalize' }}>{w.description}</p>
@@ -477,12 +505,7 @@ export default function Home() {
                     { label: 'Humidade', value: `${w.humidity}%`, icon: '💧' },
                     { label: 'Vento', value: `${w.wind_speed} m/s`, icon: '💨' },
                   ].map((item) => (
-                    <div key={item.label} style={{
-                      background: '#0f172a',
-                      borderRadius: '10px',
-                      padding: '0.8rem',
-                      textAlign: 'center'
-                    }}>
+                    <div key={item.label} style={{ background: '#0f172a', borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
                       <p style={{ fontSize: '1.2rem', margin: '0 0 0.2rem 0' }}>{item.icon}</p>
                       <p style={{ color: '#fff', fontWeight: '700', fontSize: '1rem', margin: '0 0 0.1rem 0' }}>{item.value}</p>
                       <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0 }}>{item.label}</p>
@@ -493,23 +516,14 @@ export default function Home() {
                 <button
                   onClick={() => {
                     const realName = w.provinces?.name || selectedProvince
-                    const slug = realName!
-                      .toLowerCase()
-                      .normalize('NFD')
-                      .replace(/[\u0300-\u036f]/g, '')
-                      .replace(/ /g, '-')
+                    const slug = realName!.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ /g, '-')
                     window.location.href = `/provincia/${slug}`
                   }}
                   style={{
                     width: '100%',
                     background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-                    color: '#000',
-                    padding: '0.8rem',
-                    borderRadius: '10px',
-                    border: 'none',
-                    fontWeight: '700',
-                    fontSize: '0.9rem',
-                    cursor: 'pointer',
+                    color: '#000', padding: '0.8rem', borderRadius: '10px',
+                    border: 'none', fontWeight: '700', fontSize: '0.9rem', cursor: 'pointer',
                   }}
                 >
                   Ver Detalhes Completos
@@ -518,20 +532,12 @@ export default function Home() {
             ) : (
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-                border: '1px solid #1e3a5f',
-                borderRadius: '16px',
-                padding: '2rem',
-                color: '#fff',
-                textAlign: 'center',
-                flex: 1
+                border: '1px solid #1e3a5f', borderRadius: '16px',
+                padding: '2rem', color: '#fff', textAlign: 'center', flex: 1
               }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🗺️</div>
-                <h3 style={{ color: '#94a3b8', fontWeight: '600', fontSize: '0.95rem', margin: '0 0 0.5rem 0' }}>
-                  Nenhuma Província Seleccionada
-                </h3>
-                <p style={{ color: '#475569', fontSize: '0.8rem', margin: 0 }}>
-                  Clica numa província no mapa para ver os dados meteorológicos em tempo real
-                </p>
+                <h3 style={{ color: '#94a3b8', fontWeight: '600', fontSize: '0.95rem', margin: '0 0 0.5rem 0' }}>Nenhuma Província Seleccionada</h3>
+                <p style={{ color: '#475569', fontSize: '0.8rem', margin: 0 }}>Clica numa província no mapa para ver os dados meteorológicos em tempo real</p>
               </div>
             )}
 
@@ -539,53 +545,31 @@ export default function Home() {
             <div style={{
               background: 'linear-gradient(135deg, #0f172a, #1e293b)',
               border: `1px solid ${alerts.length > 0 ? '#ef444444' : '#1e3a5f'}`,
-              borderRadius: '16px',
-              padding: '1rem',
+              borderRadius: '16px', padding: '1rem',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: alerts.length > 0 ? '0.8rem' : 0 }}>
                 <span>🚨</span>
-                <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
-                  Alertas Activos ({alerts.length})
-                </p>
+                <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>Alertas Activos ({alerts.length})</p>
               </div>
-
               {alerts.length === 0 ? (
                 <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>
-                  Nenhum alerta activo no momento. Todas as províncias monitoradas estão em condição normal.
+                  Nenhum alerta activo. Todas as províncias em condição normal.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto' }}>
                   {alerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      onClick={() => setSelectedProvince(alert.provinces?.name || '')}
-                      style={{
-                        background: '#0f172a',
-                        border: `1px solid ${severityColor(alert.severity)}44`,
-                        borderRadius: '10px',
-                        padding: '0.6rem 0.8rem',
-                        cursor: 'pointer',
-                      }}
-                    >
+                    <div key={alert.id} onClick={() => setSelectedProvince(alert.provinces?.name || '')} style={{
+                      background: '#0f172a', border: `1px solid ${severityColor(alert.severity)}44`,
+                      borderRadius: '10px', padding: '0.6rem 0.8rem', cursor: 'pointer',
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
                         <span style={{ color: '#fff', fontWeight: '700', fontSize: '0.78rem' }}>{alert.provinces?.name}</span>
-                        <span style={{
-                          color: severityColor(alert.severity),
-                          fontSize: '0.65rem',
-                          fontWeight: '700',
-                          background: `${severityColor(alert.severity)}22`,
-                          padding: '0.1rem 0.5rem',
-                          borderRadius: '10px'
-                        }}>
+                        <span style={{ color: severityColor(alert.severity), fontSize: '0.65rem', fontWeight: '700', background: `${severityColor(alert.severity)}22`, padding: '0.1rem 0.5rem', borderRadius: '10px' }}>
                           {severityLabel(alert.severity)}
                         </span>
                       </div>
-                      <p style={{ color: '#94a3b8', fontSize: '0.72rem', margin: '0 0 0.2rem 0' }}>
-                        ⚠️ {alert.type}
-                      </p>
-                      <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0, lineHeight: '1.4' }}>
-                        {alert.description}
-                      </p>
+                      <p style={{ color: '#94a3b8', fontSize: '0.72rem', margin: '0 0 0.2rem 0' }}>⚠️ {alert.type}</p>
+                      <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0, lineHeight: '1.4' }}>{alert.description}</p>
                     </div>
                   ))}
                 </div>
@@ -595,44 +579,40 @@ export default function Home() {
             {/* LISTA RAPIDA */}
             <div style={{
               background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-              border: '1px solid #1e3a5f',
-              borderRadius: '16px',
-              padding: '1rem',
-              flex: 1,
-              overflow: 'hidden'
+              border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1rem', flex: 1, overflow: 'hidden'
             }}>
               <p style={{ color: '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', margin: '0 0 0.8rem 0', letterSpacing: '0.05em' }}>
-                Temperaturas por Província
+                IRA por Província
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '300px', overflowY: 'auto' }}>
-                {weatherData
-                  .sort((a, b) => b.temperature - a.temperature)
-                  .map((item) => (
-                    <div
-                      key={item.province_id}
-                      onClick={() => setSelectedProvince(item.provinces?.name || '')}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '0.5rem 0.8rem',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        background: selectedProvince && normalize(selectedProvince) === normalize(item.provinces?.name || '') ? '#22c55e22' : '#0f172a',
-                        border: selectedProvince && normalize(selectedProvince) === normalize(item.provinces?.name || '') ? '1px solid #22c55e44' : '1px solid transparent',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>{item.provinces?.name}</span>
-                      <span style={{
-                        color: item.temperature > 25 ? '#ef4444' : item.temperature > 20 ? '#f59e0b' : '#22c55e',
-                        fontWeight: '700',
-                        fontSize: '0.85rem'
-                      }}>
-                        {item.temperature}°C
-                      </span>
-                    </div>
-                  ))}
+                {riskData
+                  .sort((a, b) => b.risk_score - a.risk_score)
+                  .map((item) => {
+                    const provinceName = weatherData.find(w => w.province_id === item.province_id)?.provinces?.name
+                    return (
+                      <div
+                        key={item.province_id}
+                        onClick={() => provinceName && setSelectedProvince(provinceName)}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '0.5rem 0.8rem', borderRadius: '8px', cursor: 'pointer',
+                          background: selectedProvince && provinceName && normalize(selectedProvince) === normalize(provinceName) ? '#22c55e22' : '#0f172a',
+                          border: selectedProvince && provinceName && normalize(selectedProvince) === normalize(provinceName) ? '1px solid #22c55e44' : '1px solid transparent',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <span style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>{provinceName}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ color: getIraColor(item.risk_score), fontWeight: '700', fontSize: '0.85rem' }}>
+                            {item.risk_score}%
+                          </span>
+                          <span style={{ color: getIraColor(item.risk_score), fontSize: '0.65rem', fontWeight: '600' }}>
+                            {getIraLabel(item.risk_score)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
 
@@ -641,10 +621,7 @@ export default function Home() {
       </div>
 
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes shake {
           0%, 100% { transform: rotate(0deg); }
           10% { transform: rotate(-10deg); }

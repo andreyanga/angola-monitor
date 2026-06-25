@@ -30,25 +30,57 @@ export async function GET() {
 
   for (const province of provinces) {
     try {
-      const res = await fetch(
+      // Condições actuais
+      const currentRes = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?lat=${province.lat}&lon=${province.lon}&appid=${apiKey}&units=metric&lang=pt`
       )
-      const data = await res.json()
+      const current = await currentRes.json()
+
+      // Previsão 5 dias / 3 horas (inclui probabilidade de chuva)
+      const forecastRes = await fetch(
+        `https://api.openweathermap.org/data/2.5/forecast?lat=${province.lat}&lon=${province.lon}&appid=${apiKey}&units=metric&lang=pt&cnt=16`
+      )
+      const forecast = await forecastRes.json()
+
+      // Probabilidade de chuva máxima nas próximas 24h
+      const next24h = forecast.list?.slice(0, 8) || []
+      const maxRainProb = next24h.length > 0
+        ? Math.round(Math.max(...next24h.map((f) => (f.pop || 0) * 100)))
+        : 0
+
+      // Previsão simplificada para as próximas 48h (por período de 3h)
+      const forecastSimple = (forecast.list || []).slice(0, 16).map((f) => ({
+        dt: f.dt,
+        dt_txt: f.dt_txt,
+        temp: f.main?.temp,
+        humidity: f.main?.humidity,
+        wind_speed: f.wind?.speed,
+        rain_prob: Math.round((f.pop || 0) * 100),
+        description: f.weather?.[0]?.description,
+        icon: f.weather?.[0]?.icon,
+      }))
 
       const weatherRecord = {
         province_id: province.id,
-        temperature: data.main.temp,
-        humidity: data.main.humidity,
-        wind_speed: data.wind.speed,
-        wind_direction: String(data.wind.deg),
-        pressure: data.main.pressure,
-        description: data.weather[0].description,
-        icon: data.weather[0].icon,
+        temperature: current.main?.temp,
+        humidity: current.main?.humidity,
+        wind_speed: current.wind?.speed,
+        wind_direction: String(current.wind?.deg || 0),
+        pressure: current.main?.pressure,
+        description: current.weather?.[0]?.description,
+        icon: current.weather?.[0]?.icon,
+        rain_probability: maxRainProb,
+        forecast_json: JSON.stringify(forecastSimple),
       }
 
       await supabase.from('weather_data').insert(weatherRecord)
 
-      results.push({ province: province.name, ...weatherRecord })
+      results.push({
+        province: province.name,
+        temperature: weatherRecord.temperature,
+        rain_probability: maxRainProb,
+        success: true
+      })
     } catch (err) {
       results.push({ province: province.name, error: err.message })
     }

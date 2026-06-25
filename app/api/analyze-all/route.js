@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { calculateIRA } from '@/lib/ira'
 
 export async function GET() {
   const apiKey = process.env.GROQ_API_KEY
@@ -28,20 +29,54 @@ export async function GET() {
         continue
       }
 
-      const prompt = `Você é um analista ambiental angolano. Com base nos dados meteorológicos abaixo da província de ${province.name}, responda APENAS com um objecto JSON válido (sem markdown, sem texto antes ou depois), no seguinte formato exacto:
+      // Buscar última leitura de sensores para esta província (se existir)
+      const { data: sensorReadings } = await supabase
+        .from('sensor_readings')
+        .select('*, sensors(sensor_type)')
+        .eq('province_id', province.id)
+        .order('recorded_at', { ascending: false })
+        .limit(10)
+
+      // Extrair valores dos sensores
+      let mq135Value = 0
+      let sw420Value = 0
+      sensorReadings?.forEach((r) => {
+        const type = r.sensors?.sensor_type || r.sensor_type || ''
+        if (type.includes('MQ') || type.includes('mq')) mq135Value = r.value
+        if (type.includes('SW') || type.includes('sw')) sw420Value = r.value
+      })
+
+      // Calcular IRA com as faixas e pesos correctos
+      const ira = calculateIRA({
+        temperature: weather.temperature,
+        humidity: weather.humidity,
+        rain: weather.rain_probability || 0,
+        wind: weather.wind_speed,
+        mq135: mq135Value,
+        sw420: sw420Value,
+      })
+
+      const rainProb = weather.rain_probability || 0
+
+      const prompt = `Você é um analista ambiental angolano. Com base nos dados abaixo da província de ${province.name}, responda APENAS com um objecto JSON válido (sem markdown, sem texto antes ou depois):
 
 {
-  "relatorio": "relatório técnico curto em português de Angola, máximo 4 frases, com riscos preventivos e recomendações práticas",
-  "tipo_perigo": "uma palavra ou expressão curta: Chuva Intensa, Calor Extremo, Vento Forte, Poluição do Ar, Seca, ou Nenhum",
-  "nivel_risco": "normal, atencao ou alerta",
-  "mitigacao": "uma frase curta e prática com a principal recomendação de mitigação"
+  "relatorio": "relatório técnico curto em português de Angola, máximo 4 frases, destacando riscos preventivos e recomendações práticas baseados APENAS nos dados fornecidos",
+  "tipo_perigo": "baseado APENAS nos dados fornecidos (não inventes): Chuva Intensa (APENAS se prob_chuva > 40%), Calor Extremo (APENAS se temp > 28°C), Vento Forte (APENAS se vento > 5 m/s), Humidade Elevada (APENAS se humidade > 85%), Seca (APENAS se humidade < 40%), Poluição do Ar (APENAS se MQ135 > 1200), ou Nenhum",
+  "nivel_risco": "${ira.level}",
+  "mitigacao": "uma frase curta e prática com a principal recomendação de mitigação baseada no perigo identificado"
 }
 
-Dados meteorológicos:
-Temperatura: ${weather.temperature}°C
-Humidade: ${weather.humidity}%
-Vento: ${weather.wind_speed} m/s
-Condição: ${weather.description}`
+Dados reais da província:
+Temperatura: ${weather.temperature}°C ${weather.temperature > 32 ? '→ ALTO' : weather.temperature >= 28 ? '→ MODERADO' : '→ BAIXO'}
+Humidade: ${weather.humidity}% ${weather.humidity > 85 ? '→ ALTO' : weather.humidity >= 70 ? '→ MODERADO' : '→ BAIXO'}
+Vento: ${weather.wind_speed} m/s ${weather.wind_speed > 10 ? '→ ALTO' : weather.wind_speed >= 5 ? '→ MODERADO' : '→ BAIXO'}
+Probabilidade de Chuva (próximas 24h): ${rainProb}% ${rainProb > 70 ? '→ ALTO' : rainProb >= 40 ? '→ MODERADO' : '→ BAIXO'}
+Qualidade do Ar MQ135: ${mq135Value} ADC ${mq135Value > 2500 ? '→ ALTO' : mq135Value > 1200 ? '→ MODERADO' : '→ BAIXO'}
+Condição actual: ${weather.description}
+IRA calculado: ${ira.score}/100 (${ira.label})
+
+REGRA IMPORTANTE: O tipo_perigo deve ser "Nenhum" se nenhuma variável atingir o limiar indicado acima. NÃO classifiques como Chuva Intensa se prob_chuva for ${rainProb}%.`
 
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -52,7 +87,7 @@ Condição: ${weather.description}`
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.4,
+          temperature: 0.3,
           max_tokens: 400,
           response_format: { type: 'json_object' },
         }),
@@ -62,7 +97,7 @@ Condição: ${weather.description}`
 
       if (data.error) {
         results.push({ province: province.name, error: data.error.message })
-        await new Promise((resolve) => setTimeout(resolve, 2500))
+        await new Promise((r) => setTimeout(r, 2500))
         continue
       }
 
@@ -71,34 +106,20 @@ Condição: ${weather.description}`
         parsed = JSON.parse(data.choices[0].message.content)
       } catch (e) {
         results.push({ province: province.name, error: 'Resposta da IA não é JSON válido' })
-        await new Promise((resolve) => setTimeout(resolve, 2500))
+        await new Promise((r) => setTimeout(r, 2500))
         continue
       }
 
-      // Calcular risk_score numérico (mantemos a lógica numérica como suporte)
-      let riskScore = 20
-      if (weather.humidity > 85) riskScore += 25
-      if (weather.temperature > 28) riskScore += 25
-      if (weather.wind_speed > 5) riskScore += 15
-      if (riskScore > 100) riskScore = 100
-
-      // Gravar relatório
+      // Gravar relatório com IRA correcto
       await supabase.from('reports').insert({
         province_id: province.id,
         content: parsed.relatorio,
         summary: parsed.relatorio.slice(0, 150),
-        risk_score: riskScore,
+        risk_score: ira.score,
       })
 
-      // Se o nível de risco indicado pela IA (ou pelo score) for atencao/alerta, gravar um alerta
-      const nivel = parsed.nivel_risco === 'alerta' || riskScore >= 60
-        ? 'alerta'
-        : (parsed.nivel_risco === 'atencao' || riskScore >= 30)
-          ? 'atencao'
-          : 'normal'
-
-      if (nivel !== 'normal' && parsed.tipo_perigo && parsed.tipo_perigo !== 'Nenhum') {
-        // Desactivar alertas antigos desta província antes de criar um novo
+      // Gravar alerta se necessário
+      if (ira.level !== 'normal' && parsed.tipo_perigo && parsed.tipo_perigo !== 'Nenhum') {
         await supabase
           .from('alerts')
           .update({ is_active: false, resolved_at: new Date().toISOString() })
@@ -108,13 +129,12 @@ Condição: ${weather.description}`
         await supabase.from('alerts').insert({
           province_id: province.id,
           type: parsed.tipo_perigo,
-          severity: nivel,
+          severity: ira.level,
           title: `${parsed.tipo_perigo} — ${province.name}`,
           description: parsed.mitigacao,
           is_active: true,
         })
       } else {
-        // Se voltou ao normal, desactivar alertas antigos
         await supabase
           .from('alerts')
           .update({ is_active: false, resolved_at: new Date().toISOString() })
@@ -122,9 +142,17 @@ Condição: ${weather.description}`
           .eq('is_active', true)
       }
 
-      results.push({ province: province.name, risk_score: riskScore, nivel, tipo_perigo: parsed.tipo_perigo, success: true })
+      results.push({
+        province: province.name,
+        ira_score: ira.score,
+        ira_label: ira.label,
+        ira_level: ira.level,
+        rain_prob: rainProb,
+        tipo_perigo: parsed.tipo_perigo,
+        success: true
+      })
 
-      await new Promise((resolve) => setTimeout(resolve, 2500))
+      await new Promise((r) => setTimeout(r, 2500))
     } catch (err) {
       results.push({ province: province.name, error: err.message })
     }
