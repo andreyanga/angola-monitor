@@ -608,23 +608,105 @@ export default function Home() {
                   )}
                 </div>
 
-                <div style={{ background: '#0f172a', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
-                  <p style={{ color: '#64748b', fontSize: '0.7rem', margin: '0 0 0.3rem 0' }}>TEMPERATURA</p>
-                  <p style={{ color: '#f59e0b', fontSize: '2.5rem', fontWeight: '800', margin: 0 }}>{w.temperature}°C</p>
-                  <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.3rem 0 0 0', textTransform: 'capitalize' }}>{w.description}</p>
+               {/* CHUVA E VENTO — variáveis principais (peso 30% e 20%) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                  <div style={{
+                    background: '#0f172a',
+                    borderRadius: '10px',
+                    padding: '0.8rem',
+                    textAlign: 'center',
+                    border: `1px solid ${(w as any).rain_probability > 70 ? '#ef444455' : (w as any).rain_probability >= 40 ? '#eab30855' : '#3b82f622'}`
+                  }}>
+                    <p style={{ color: '#64748b', fontSize: '0.6rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0', letterSpacing: '0.05em' }}>
+                      🌧️ Prob. Chuva <span style={{ color: '#475569' }}>(30%)</span>
+                    </p>
+                    <p style={{
+                      color: (w as any).rain_probability > 70 ? '#ef4444' : (w as any).rain_probability >= 40 ? '#eab308' : '#3b82f6',
+                      fontSize: '1.6rem', fontWeight: '800', margin: '0 0 0.1rem 0'
+                    }}>
+                      {(w as any).rain_probability ?? 0}%
+                    </p>
+                    <p style={{
+                      color: (w as any).rain_probability > 70 ? '#ef4444' : (w as any).rain_probability >= 40 ? '#eab308' : '#22c55e',
+                      fontSize: '0.65rem', fontWeight: '600', margin: 0
+                    }}>
+                      {(w as any).rain_probability > 70 ? 'ALTO' : (w as any).rain_probability >= 40 ? 'MODERADO' : 'BAIXO'}
+                    </p>
+                  </div>
+
+                  <div style={{
+                    background: '#0f172a',
+                    borderRadius: '10px',
+                    padding: '0.8rem',
+                    textAlign: 'center',
+                    border: `1px solid ${w.wind_speed > 10 ? '#ef444455' : w.wind_speed >= 5 ? '#eab30855' : '#22c55e22'}`
+                  }}>
+                    <p style={{ color: '#64748b', fontSize: '0.6rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0', letterSpacing: '0.05em' }}>
+                      💨 Vento <span style={{ color: '#475569' }}>(20%)</span>
+                    </p>
+                    <p style={{
+                      color: w.wind_speed > 10 ? '#ef4444' : w.wind_speed >= 5 ? '#eab308' : '#22c55e',
+                      fontSize: '1.6rem', fontWeight: '800', margin: '0 0 0.1rem 0'
+                    }}>
+                      {w.wind_speed}
+                      <span style={{ fontSize: '0.8rem', fontWeight: '400' }}> m/s</span>
+                    </p>
+                    <p style={{
+                      color: w.wind_speed > 10 ? '#ef4444' : w.wind_speed >= 5 ? '#eab308' : '#22c55e',
+                      fontSize: '0.65rem', fontWeight: '600', margin: 0
+                    }}>
+                      {w.wind_speed > 10 ? 'ALTO' : w.wind_speed >= 5 ? 'MODERADO' : 'BAIXO'}
+                    </p>
+                  </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1rem' }}>
-                  {[
-                    { label: 'Humidade', value: `${w.humidity}%`, icon: '💧' },
-                    { label: 'Vento', value: `${w.wind_speed} m/s`, icon: '💨' },
-                  ].map((item) => (
-                    <div key={item.label} style={{ background: '#0f172a', borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
-                      <p style={{ fontSize: '1.2rem', margin: '0 0 0.2rem 0' }}>{item.icon}</p>
-                      <p style={{ color: '#fff', fontWeight: '700', fontSize: '1rem', margin: '0 0 0.1rem 0' }}>{item.value}</p>
-                      <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0 }}>{item.label}</p>
-                    </div>
-                  ))}
+                {/* HUMIDADE E TEMPERATURA — variáveis secundárias */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.8rem' }}>
+                  <div style={{
+                    background: '#0f172a',
+                    borderRadius: '10px',
+                    padding: '0.7rem',
+                    textAlign: 'center',
+                    border: `1px solid ${w.humidity > 85 ? '#ef444433' : w.humidity >= 70 ? '#eab30833' : '#1e3a5f'}`
+                  }}>
+                    <p style={{ color: '#64748b', fontSize: '0.6rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>
+                      💧 Humidade <span style={{ color: '#475569' }}>(20%)</span>
+                    </p>
+                    <p style={{
+                      color: w.humidity > 85 ? '#ef4444' : w.humidity >= 70 ? '#eab308' : '#06b6d4',
+                      fontSize: '1.3rem', fontWeight: '700', margin: 0
+                    }}>
+                      {w.humidity}%
+                    </p>
+                  </div>
+
+                  <div style={{
+                    background: '#0f172a',
+                    borderRadius: '10px',
+                    padding: '0.7rem',
+                    textAlign: 'center',
+                    border: `1px solid ${w.temperature > 32 ? '#ef444433' : w.temperature >= 28 ? '#eab30833' : '#1e3a5f'}`
+                  }}>
+                    <p style={{ color: '#64748b', fontSize: '0.6rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>
+                      🌡️ Temperatura <span style={{ color: '#475569' }}>(15%)</span>
+                    </p>
+                    <p style={{
+                      color: w.temperature > 32 ? '#ef4444' : w.temperature >= 28 ? '#eab308' : '#f59e0b',
+                      fontSize: '1.3rem', fontWeight: '700', margin: 0
+                    }}>
+                      {w.temperature}°C
+                    </p>
+                  </div>
+                </div>
+
+                {/* CONDIÇÃO ACTUAL */}
+                <div style={{
+                  background: '#0f172a', borderRadius: '8px', padding: '0.5rem 0.8rem',
+                  textAlign: 'center', marginBottom: '0.8rem'
+                }}>
+                  <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0, textTransform: 'capitalize' }}>
+                    {w.description}
+                  </p>
                 </div>
 
                 <button
