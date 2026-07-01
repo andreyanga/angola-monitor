@@ -133,7 +133,7 @@ export default function ProvinciaPage() {
         .select('*')
         .eq('province_id', prov.id)
         .order('recorded_at', { ascending: false })
-        .limit(10)
+        .limit(24)
 
       if (weatherData && weatherData.length > 0) {
         setWeather(weatherData[0])
@@ -534,28 +534,55 @@ export default function ProvinciaPage() {
           )}
         </div>
 
-        {/* HISTORICO */}
-        <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
-          <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1.5rem 0' }}>Histórico de Leituras</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {history.map((h, i) => (
-              <div key={i} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.7rem 1rem',
-                background: i === 0 ? '#22c55e11' : '#0f172a',
-                borderRadius: '8px',
-                border: i === 0 ? '1px solid #22c55e33' : '1px solid transparent'
-              }}>
-                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
-                  {new Date(h.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <span style={{ color: '#f59e0b', fontWeight: '700' }}>{h.temperature}°C</span>
-                <span style={{ color: '#06b6d4' }}>{h.humidity}%</span>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem', textTransform: 'capitalize' }}>{h.description}</span>
-              </div>
-            ))}
+        {/* HISTÓRICO 24H */}
+        {history.length > 0 && (
+          <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+            <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1.2rem 0' }}>
+              🕐 Histórico das Últimas 24h
+            </h2>
+
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart
+                data={[...history].reverse().map((h) => ({
+                  hora: new Date(h.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                  Temp: h.temperature,
+                  Humidade: h.humidity,
+                  Vento: h.wind_speed,
+                }))}
+                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
+                <XAxis dataKey="hora" tick={{ fill: '#64748b', fontSize: 10 }} interval={2} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '0.75rem', color: '#94a3b8' }} />
+                <Line type="monotone" dataKey="Temp" stroke="#f59e0b" strokeWidth={2} dot={false} name="Temp" />
+                <Line type="monotone" dataKey="Humidade" stroke="#06b6d4" strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="Humidade" />
+                <Line type="monotone" dataKey="Vento" stroke="#8b5cf6" strokeWidth={1.5} dot={false} strokeDasharray="2 2" name="Vento" />
+              </LineChart>
+            </ResponsiveContainer>
+
+            <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+              {history.map((h, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '0.5rem 0.8rem',
+                  background: i === 0 ? '#22c55e11' : '#0f172a',
+                  borderRadius: '8px',
+                  border: i === 0 ? '1px solid #22c55e33' : '1px solid transparent'
+                }}>
+                  <span style={{ color: '#64748b', fontSize: '0.72rem' }}>
+                    {new Date(h.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span style={{ color: '#f59e0b', fontWeight: '700', fontSize: '0.8rem' }}>{h.temperature}°C</span>
+                  <span style={{ color: '#06b6d4', fontSize: '0.8rem' }}>{h.humidity}%</span>
+                  <span style={{ color: '#8b5cf6', fontSize: '0.8rem' }}>{h.wind_speed} m/s</span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.75rem', textTransform: 'capitalize' }}>{h.description}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* MUNICÍPIOS E SENSORES */}
         <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -631,7 +658,6 @@ export default function ProvinciaPage() {
             </div>
           </div>
         </div>
-
       </div>
     </main>
   )
