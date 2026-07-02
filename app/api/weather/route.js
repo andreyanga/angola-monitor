@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { log } from '@/lib/logger'
 
 const provinces = [
   { id: 1,  name: 'Bengo',         capital: 'Dande',        lat: -8.4590,  lon: 13.5490 },
@@ -74,6 +75,15 @@ export async function GET() {
       }
 
       await supabase.from('weather_data').insert(weatherRecord)
+      
+      // Log de actualização meteorológica
+      await log({
+        event_type: 'weather_update',
+        title: `Dados meteorológicos actualizados — ${province.name}`,
+        description: `Temp: ${weatherRecord.temperature}°C | Humidade: ${weatherRecord.humidity}% | Vento: ${weatherRecord.wind_speed} m/s | Chuva: ${maxRainProb}%`,
+        province_id: province.id,
+        severity: 'info',
+      })
 
       results.push({
         province: province.name,

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { calculateIRA } from '@/lib/ira'
+import { log } from '@/lib/logger'
 
 export async function GET() {
   const apiKey = process.env.GROQ_API_KEY
@@ -118,6 +119,14 @@ REGRA IMPORTANTE: O tipo_perigo deve ser "Nenhum" se nenhuma variável atingir o
         risk_score: ira.score,
       })
 
+      await log({
+        event_type: 'ia_report',
+        title: `Relatório IA gerado — ${province.name}`,
+        description: `IRA: ${ira.score}/100 (${ira.label}) | Perigo: ${parsed.tipo_perigo}`,
+        province_id: province.id,
+        severity: ira.level === 'alerta' ? 'critical' : ira.level === 'atencao' ? 'warning' : 'info',
+      })
+
       // Gravar alerta se necessário
       if (ira.level !== 'normal' && parsed.tipo_perigo && parsed.tipo_perigo !== 'Nenhum') {
         await supabase
@@ -133,6 +142,14 @@ REGRA IMPORTANTE: O tipo_perigo deve ser "Nenhum" se nenhuma variável atingir o
           title: `${parsed.tipo_perigo} — ${province.name}`,
           description: parsed.mitigacao,
           is_active: true,
+        })
+
+        await log({
+          event_type: 'alert_generated',
+          title: `Alerta gerado — ${province.name}`,
+          description: `Tipo: ${parsed.tipo_perigo} | Nível: ${ira.level} | ${parsed.mitigacao}`,
+          province_id: province.id,
+          severity: ira.level === 'alerta' ? 'critical' : 'warning',
         })
       } else {
         await supabase

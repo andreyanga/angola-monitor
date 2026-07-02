@@ -285,7 +285,24 @@ export default function Home() {
             </p>
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
+
+        
+        <div style={{ textAlign: 'right' }}>  
+          <button
+              onClick={() => window.location.href = '/logs'}
+              style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '8px',
+                color: '#94a3b8',
+                padding: '0.3rem 0.8rem',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                marginRight: '0.5rem'
+              }}>
+              Logs
+        </button>
+
           <div style={{
             background: `${apiStatus.color}22`,
             border: `1px solid ${apiStatus.color}44`,
@@ -296,6 +313,8 @@ export default function Home() {
             gap: '0.4rem',
             marginBottom: '0.3rem'
           }}>
+
+            
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: apiStatus.dot, animation: 'pulse 2s infinite' }} />
             <span style={{ color: apiStatus.color, fontSize: '0.75rem', fontWeight: '600' }}>{apiStatus.label}</span>
           </div>
