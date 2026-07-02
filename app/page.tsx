@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 const AngolaMap = dynamic(() => import('@/components/AngolaMap'), {
   ssr: false,
   loading: () => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '600px', color: '#94a3b8' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '500px', color: '#94a3b8' }}>
       A carregar mapa...
     </div>
   ),
@@ -75,6 +75,7 @@ export default function Home() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [showCuandoCubangoChoice, setShowCuandoCubangoChoice] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [systemStatus, setSystemStatus] = useState<any>(null)
 
   useEffect(() => {
     function updateClock() {
@@ -122,6 +123,16 @@ export default function Home() {
       setAlerts(data || [])
     }
 
+  async function fetchStatus() {
+  try {
+    const res = await fetch('/api/status')
+    const data = await res.json()
+    setSystemStatus(data)
+  } catch {
+    setSystemStatus(null)
+  }
+}
+
     async function fetchSensors() {
       const { data } = await supabase
         .from('sensors')
@@ -153,13 +164,16 @@ export default function Home() {
     fetchWeather()
     fetchRisk()
     fetchAlerts()
+    fetchStatus()
     fetchSensors()
 
     const interval = setInterval(() => {
       fetchWeather()
       fetchRisk()
       fetchAlerts()
+      fetchStatus()
       fetchSensors()
+
     }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
@@ -418,17 +432,21 @@ export default function Home() {
         </div>
       )}
 
+      
+
       <div style={{ padding: '1.5rem 2rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
 
-          {/* MAPA */}
-          <div style={{
-            background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-            border: '1px solid #1e3a5f',
-            borderRadius: '16px',
-            overflow: 'hidden',
-            position: 'relative'
-          }}>
+         {/* MAPA */}
+            <div style={{
+              background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+              border: '1px solid #1e3a5f',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
             <div style={{
               padding: '1rem 1.5rem',
               borderBottom: '1px solid #1e3a5f',
@@ -462,16 +480,18 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <AngolaMap
-              onProvinceClick={handleProvinceClick}
-              weatherData={weatherData}
-              riskByProvinceName={riskByProvinceName}
-              sensors={sensors}
-              onSensorClick={(sensor: Sensor) => {
-                setSelectedSensor(sensor)
-                setSelectedProvince(null)
-              }}
-            />
+            <div style={{ flex: 1, minHeight: '500px', position: 'relative' }}>
+              <AngolaMap
+                onProvinceClick={handleProvinceClick}
+                weatherData={weatherData}
+                riskByProvinceName={riskByProvinceName}
+                sensors={sensors}
+                onSensorClick={(sensor: Sensor) => {
+                  setSelectedSensor(sensor)
+                  setSelectedProvince(null)
+                }}
+              />
+            </div>
 
             {showCuandoCubangoChoice && (
               <div style={{
@@ -798,8 +818,81 @@ export default function Home() {
             </div>
 
           </div>
+          </div>
+
+         {/* ESTADO DA COMUNICAÇÃO */}
+          {systemStatus && (
+          <div style={{
+            background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+            border: '1px solid #1e3a5f',
+            borderRadius: '16px',
+            padding: '1rem 1.5rem',
+            marginTop: '1.5rem'
+          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
+            <span style={{ fontSize: '0.9rem' }}>📡</span>
+            <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
+              Estado da Comunicação
+            </p>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <div style={{
+                width: '7px', height: '7px', borderRadius: '50%',
+                background: systemStatus.overall === 'online' ? '#22c55e' : '#eab308',
+                animation: 'pulse 2s infinite'
+              }} />
+              <span style={{
+                color: systemStatus.overall === 'online' ? '#22c55e' : '#eab308',
+                fontSize: '0.65rem', fontWeight: '600'
+              }}>
+                {systemStatus.overall === 'online' ? 'Todos os sistemas operacionais' : 'Atenção'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {Object.values(systemStatus.services).map((s: any) => (
+              <div key={s.label} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '0.4rem 0.6rem',
+                background: '#0f172a',
+                borderRadius: '8px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{
+                    width: '7px', height: '7px', borderRadius: '50%',
+                    background: s.status === 'online' ? '#22c55e' : s.status === 'degraded' ? '#eab308' : '#ef4444'
+                  }} />
+                  <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>{s.label}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  {s.details && (
+                    <span style={{ color: '#475569', fontSize: '0.65rem' }}>{s.details}</span>
+                  )}
+                  {s.latency !== null && (
+                    <span style={{ color: '#475569', fontSize: '0.65rem' }}>{s.latency}ms</span>
+                  )}
+                  <span style={{
+                    color: s.status === 'online' ? '#22c55e' : s.status === 'degraded' ? '#eab308' : '#ef4444',
+                    fontSize: '0.65rem', fontWeight: '700',
+                    background: s.status === 'online' ? '#22c55e22' : s.status === 'degraded' ? '#eab30822' : '#ef444422',
+                    padding: '0.1rem 0.4rem', borderRadius: '4px'
+                  }}>
+                    {s.status === 'online' ? 'ONLINE' : s.status === 'degraded' ? 'DEGRADADO' : 'OFFLINE'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ color: '#334155', fontSize: '0.6rem', margin: '0.5rem 0 0 0', textAlign: 'right' }}>
+            Verificado às {systemStatus.checked_at ? new Date(systemStatus.checked_at).toLocaleTimeString('pt-AO') : '--'}
+          </p>
+      
         </div>
-      </div>
+          )}
+        </div>
+
+      
 
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
@@ -9,6 +9,21 @@ const riskColors = {
   normal: '#22c55e',
   atencao: '#eab308',
   alerta: '#ef4444',
+}
+
+function MapResizer() {
+  const map = useMap()
+
+  useEffect(() => {
+    const container = map.getContainer()
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize()
+    })
+    resizeObserver.observe(container)
+    return () => resizeObserver.disconnect()
+  }, [map])
+
+  return null
 }
 
 const normalize = (str) =>
@@ -102,13 +117,14 @@ export default function AngolaMap({ onProvinceClick, weatherData, riskByProvince
     <MapContainer
       center={[-11.2, 17.8]}
       zoom={5}
-      style={{ height: '600px', width: '100%', borderRadius: '12px' }}
+      style={{ height: '100%', width: '100%', borderRadius: '12px' }}
       scrollWheelZoom={false}
     >
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; OpenStreetMap &copy; CARTO'
       />
+      <MapResizer />
 
       {/* GeoJSON das províncias — z-index baixo */}
       {geoData && (
