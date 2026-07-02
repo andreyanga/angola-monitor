@@ -584,7 +584,10 @@ export default function Home() {
 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
-                    onClick={() => setSelectedProvince(selectedSensor.provincia)}
+                    onClick={() => {
+                      setSelectedProvince(selectedSensor.provincia)
+                      setSelectedSensor(null)
+                    }}
                     style={{
                       flex: 1, background: '#1e293b', border: '1px solid #334155',
                       color: '#94a3b8', padding: '0.4rem', borderRadius: '8px',
