@@ -603,17 +603,24 @@ export default function Home() {
 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
-                    onClick={() => {
-                      setSelectedProvince(selectedSensor.provincia)
-                      setSelectedSensor(null)
-                    }}
+                    onClick={() => window.location.href = `/central/${selectedSensor.id}`}
                     style={{
-                      flex: 1, background: '#1e293b', border: '1px solid #334155',
-                      color: '#94a3b8', padding: '0.4rem', borderRadius: '8px',
+                      flex: 1, background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                      border: 'none', color: '#fff', padding: '0.4rem', borderRadius: '8px',
+                      fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600'
+                    }}
+                  >
+                    Ver Central Completa
+                  </button>
+                  <button
+                    onClick={() => setSelectedProvince(selectedSensor.provincia)}
+                    style={{
+                      background: '#1e293b', border: '1px solid #334155',
+                      color: '#94a3b8', padding: '0.4rem 0.6rem', borderRadius: '8px',
                       fontSize: '0.72rem', cursor: 'pointer'
                     }}
                   >
-                    Ver Província
+                    Província
                   </button>
                   <button
                     onClick={() => setSelectedSensor(null)}
@@ -626,6 +633,7 @@ export default function Home() {
                     ×
                   </button>
                 </div>
+                
               </div>
             )}
 
