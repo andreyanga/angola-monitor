@@ -76,11 +76,14 @@ export default function Home() {
   const [showCuandoCubangoChoice, setShowCuandoCubangoChoice] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [systemStatus, setSystemStatus] = useState<any>(null)
+  const [recentLogs, setRecentLogs] = useState<any[]>([])
 
   useEffect(() => {
     function updateClock() {
       setCurrentTime(new Date().toLocaleString('pt-AO', { dateStyle: 'full', timeStyle: 'medium' }))
     }
+
+
     updateClock()
     const interval = setInterval(updateClock, 1000)
     return () => clearInterval(interval)
@@ -99,6 +102,15 @@ export default function Home() {
       })
       setWeatherData(Object.values(latest))
       if (data && data.length > 0) setLastUpdate(new Date(data[0].recorded_at))
+    }
+
+    async function fetchRecentLogs() {
+      const { data } = await supabase
+        .from('logs')
+        .select('*, provinces(name)')
+        .order('created_at', { ascending: false })
+        .limit(15)
+      setRecentLogs(data || [])
     }
 
     async function fetchRisk() {
@@ -166,6 +178,7 @@ export default function Home() {
     fetchAlerts()
     fetchStatus()
     fetchSensors()
+    fetchRecentLogs()
 
     const interval = setInterval(() => {
       fetchWeather()
@@ -173,6 +186,7 @@ export default function Home() {
       fetchAlerts()
       fetchStatus()
       fetchSensors()
+      fetchRecentLogs()
 
     }, 5 * 60 * 1000)
     return () => clearInterval(interval)
@@ -918,12 +932,120 @@ export default function Home() {
             Verificado às {systemStatus.checked_at ? new Date(systemStatus.checked_at).toLocaleTimeString('pt-AO') : '--'}
           </p>
       
-        </div>
+          </div>
+          )}
+
+          {/* LINHA TEMPORAL DE EVENTOS */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+          border: '1px solid #1e3a5f',
+          borderRadius: '16px',
+          padding: '1rem 1.5rem',
+          marginTop: '1.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span></span>
+              <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
+                Linha Temporal de Eventos
+              </p>
+            </div>
+            <button
+              onClick={() => window.location.href = '/logs'}
+              style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#64748b', padding: '0.2rem 0.6rem', cursor: 'pointer', fontSize: '0.7rem' }}
+            >
+              Ver todos os logs →
+            </button>
+          </div>
+
+          {recentLogs.length === 0 ? (
+            <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0, textAlign: 'center', padding: '1rem' }}>
+              Nenhum evento registado ainda.
+            </p>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              {/* Linha vertical da timeline */}
+              <div style={{
+                position: 'absolute', left: '11px', top: '8px', bottom: '8px',
+                width: '2px', background: '#1e3a5f'
+              }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {recentLogs.map((log, i) => {
+                  const eventColors: Record<string, string> = {
+                    alert_generated: '#ef4444',
+                    ia_report: '#3b82f6',
+                    weather_update: '#22c55e',
+                    sensor_reading: '#8b5cf6',
+                    api_error: '#ef4444',
+                  }
+                  const eventIcons: Record<string, string> = {
+                    alert_generated: '🚨',
+                    ia_report: '🤖',
+                    weather_update: '🌤️',
+                    sensor_reading: '📡',
+                    api_error: '❌',
+                  }
+                  const color = eventColors[log.event_type] || '#64748b'
+                  const icon = eventIcons[log.event_type] || '📌'
+
+                  return (
+                    <div key={log.id} style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start' }}>
+                      {/* Dot da timeline */}
+                      <div style={{
+                        width: '24px', height: '24px', borderRadius: '50%',
+                        background: `${color}22`, border: `2px solid ${color}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.65rem', flexShrink: 0, zIndex: 1,
+                        marginTop: '0.1rem'
+                      }}>
+                        {icon}
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.1rem', flexWrap: 'wrap' }}>
+                          <span style={{ color: '#cbd5e1', fontSize: '0.78rem', fontWeight: '600' }}>
+                            {log.title}
+                          </span>
+                          {log.provinces?.name && (
+                            <span style={{ color: '#475569', fontSize: '0.65rem' }}>
+                              — {log.provinces.name}
+                            </span>
+                          )}
+                        </div>
+                        {log.description && (
+                          <p style={{ color: '#475569', fontSize: '0.68rem', margin: '0 0 0.1rem 0', lineHeight: '1.3' }}>
+                            {log.description}
+                          </p>
+                        )}
+                        <span style={{ color: '#334155', fontSize: '0.62rem' }}>
+                          {new Date(log.created_at).toLocaleString('pt-AO', {
+                            day: '2-digit', month: '2-digit',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Badge de severidade */}
+                      <span style={{
+                        color: log.severity === 'critical' ? '#ef4444' : log.severity === 'warning' ? '#eab308' : '#3b82f6',
+                        fontSize: '0.6rem', fontWeight: '700',
+                        background: log.severity === 'critical' ? '#ef444422' : log.severity === 'warning' ? '#eab30822' : '#3b82f622',
+                        padding: '0.1rem 0.4rem', borderRadius: '4px',
+                        flexShrink: 0, marginTop: '0.2rem'
+                      }}>
+                        {log.severity === 'critical' ? 'CRÍTICO' : log.severity === 'warning' ? 'ATENÇÃO' : 'INFO'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
 
-      
-
+        </div>
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         @keyframes shake {

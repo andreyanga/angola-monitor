@@ -220,7 +220,7 @@ export default function CentralPage() {
           {/* LEITURAS DOS SENSORES */}
           <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem' }}>
             <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1.5rem 0' }}>
-              📊 Leituras Actuais dos Sensores
+               Leituras Actuais dos Sensores
             </h2>
 
             {readings.length === 0 ? (
@@ -343,7 +343,7 @@ export default function CentralPage() {
         {readings.length > 0 && (
           <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
             <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1.2rem 0' }}>
-              📈 Histórico de Leituras
+               Histórico de Leituras
             </h2>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -388,7 +388,7 @@ export default function CentralPage() {
         {/* INFO TÉCNICA */}
         <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem' }}>
           <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1rem 0' }}>
-            🔧 Informações Técnicas
+             Informações Técnicas
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
             {[
