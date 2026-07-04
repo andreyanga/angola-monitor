@@ -493,9 +493,9 @@ export default function Home() {
               </div>
               <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
                 {[
-                  { label: 'Normal', color: '#22c55e' },
-                  { label: 'Atenção', color: '#eab308' },
-                  { label: 'Alerta', color: '#ef4444' },
+                  { label: 'Baixa Vulnerabilidade', color: '#22c55e' },
+                  { label: 'Vulnerabilidade Moderada', color: '#eab308' },
+                  { label: 'Alta Vulnerabilidade', color: '#ef4444' },
                 ].map((l) => (
                   <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: l.color }} />
