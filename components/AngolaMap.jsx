@@ -140,9 +140,15 @@ export default function AngolaMap({ onProvinceClick, weatherData, riskByProvince
       {sensors?.map((sensor) => {
         if (!sensor.latitude || !sensor.longitude) return null
 
-        const icon = sensor.is_active
-          ? createSensorIcon(sensor.has_alert ? '#ef4444' : '#22c55e')
-          : createInactiveIcon()
+        const getSensorColor = () => {
+          if (!sensor.is_active) return null
+          if (sensor.has_alert) return '#ef4444'
+          if (!sensor.is_online) return '#ef4444'
+          return '#22c55e'
+        }
+
+        const color = getSensorColor()
+        const icon = color ? createSensorIcon(color) : createInactiveIcon()
 
         return (
           <Marker
@@ -170,9 +176,7 @@ export default function AngolaMap({ onProvinceClick, weatherData, riskByProvince
                 <p style={{ margin: '0 0 0.2rem 0', fontSize: '0.75rem' }}>
                   🏛️ {sensor.provincia}
                 </p>
-                <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '600', color: sensor.is_active ? '#16a34a' : '#64748b' }}>
-                  {sensor.is_active ? '🟢 Activa — clica para ver dados' : '⚫ Inactiva'}
-                </p>
+                
               </div>
             </Popup>
           </Marker>

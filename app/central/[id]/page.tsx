@@ -9,12 +9,16 @@ interface Sensor {
   id: number
   name: string
   is_active: boolean
+  is_online: boolean
+  last_seen: string
   sensor_type: string
   mac_address: string
   installed_at: string
   zones: { name: string; latitude: number; longitude: number }
   municipalities: { name: string }
   provinces: { id: number; name: string; slug: string }
+  mq135_last?: { value: number; unit: string; status: string; recorded_at: string } | null
+  sw420_last?: { value: number; unit: string; status: string; recorded_at: string } | null
 }
 
 interface SensorReading {
@@ -102,6 +106,9 @@ export default function CentralPage() {
       setLoading(false)
     }
     fetchData()
+
+    const interval = setInterval(fetchData, 60 * 1000)
+    return () => clearInterval(interval)
   }, [id])
 
   if (loading) return (
@@ -135,9 +142,10 @@ export default function CentralPage() {
   }))
 
   const getStatusColor = () => {
-    if (!sensor.is_active) return '#64748b'
-    return '#22c55e'
-  }
+  if (!sensor.is_active) return '#64748b'
+  if (!sensor.is_online) return '#ef4444'
+  return '#22c55e'
+}
 
   const getMQ135Status = (value: number) => {
     if (value > 2500) return { label: 'ALTO', color: '#ef4444' }
@@ -182,8 +190,8 @@ export default function CentralPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: getStatusColor(), animation: sensor.is_active ? 'pulse 2s infinite' : 'none' }} />
           <span style={{ color: getStatusColor(), fontSize: '0.85rem', fontWeight: '600' }}>
-            {sensor.is_active ? 'Central Activa' : 'Central Inactiva'}
-          </span>
+  {!sensor.is_active ? 'Central Inactiva' : sensor.is_online ? 'Central Activa' : 'Central Offline'}
+</span>
         </div>
       </header>
 
@@ -220,15 +228,18 @@ export default function CentralPage() {
           {/* LEITURAS DOS SENSORES */}
           <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem' }}>
             <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1.5rem 0' }}>
-               Leituras Actuais dos Sensores
+               Leituras dos Sensores
             </h2>
 
-            {readings.length === 0 ? (
+            {!sensor.is_online && readings.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#475569' }}>
+                <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>⚫</p>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>Central offline — sem dados disponíveis.</p>
+              </div>
+            ) : readings.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#475569' }}>
                 <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>📡</p>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  {sensor.is_active ? 'Aguardando primeiras leituras do sensor...' : 'Central inactiva — sem dados disponíveis.'}
-                </p>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>Aguardando primeiras leituras do sensor...</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

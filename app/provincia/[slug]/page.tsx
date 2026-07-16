@@ -201,6 +201,9 @@ export default function ProvinciaPage() {
       setLoading(false)
     }
     fetchData()
+
+    const interval = setInterval(fetchData, 60 * 1000)
+    return () => clearInterval(interval)
   }, [slug])
 
   async function gerarRelatorio() {

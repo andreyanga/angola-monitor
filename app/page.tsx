@@ -45,6 +45,8 @@ interface Sensor {
   id: number
   name: string
   is_active: boolean
+  is_online: boolean
+  last_seen: string
   sensor_type: string
   latitude: number
   longitude: number
@@ -52,6 +54,8 @@ interface Sensor {
   municipio: string
   provincia: string
   has_alert?: boolean
+  mq135_last?: { value: number; unit: string; status: string; recorded_at: string } | null
+  sw420_last?: { value: number; unit: string; status: string; recorded_at: string } | null
 }
 
 const normalize = (str: string) =>
@@ -146,32 +150,58 @@ export default function Home() {
 }
 
     async function fetchSensors() {
-      const { data } = await supabase
-        .from('sensors')
-        .select(`
-          id, name, is_active, sensor_type,
-          zones (name, latitude, longitude),
-          municipalities (name),
-          provinces (name)
-        `)
+  const { data } = await supabase
+    .from('sensors')
+    .select(`
+      id, name, is_active, is_online, last_seen, sensor_type,
+      zones (name, latitude, longitude),
+      municipalities (name),
+      provinces (name)
+    `)
 
-      const alertProvinces = alerts.map((a) => a.provinces?.name)
+  const alertProvinces = alerts.map((a) => a.provinces?.name)
 
-      const mapped = (data || []).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        is_active: s.is_active,
-        sensor_type: s.sensor_type,
-        latitude: s.zones?.latitude,
-        longitude: s.zones?.longitude,
-        zona: s.zones?.name,
-        municipio: s.municipalities?.name,
-        provincia: s.provinces?.name,
-        has_alert: alertProvinces.includes(s.provinces?.name),
-      }))
+  const mapped = await Promise.all((data || []).map(async (s: any) => {
+    // Buscar última leitura MQ135
+    const { data: mq135 } = await supabase
+      .from('sensor_readings')
+      .select('value, unit, status, recorded_at')
+      .eq('sensor_id', s.id)
+      .eq('sensor_type', 'MQ-135')
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-      setSensors(mapped.filter((s: Sensor) => s.latitude && s.longitude))
+    // Buscar última leitura SW420
+    const { data: sw420 } = await supabase
+      .from('sensor_readings')
+      .select('value, unit, status, recorded_at')
+      .eq('sensor_id', s.id)
+      .eq('sensor_type', 'SW-420')
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    return {
+      id: s.id,
+      name: s.name,
+      is_active: s.is_active,
+      is_online: s.is_online,
+      last_seen: s.last_seen,
+      sensor_type: s.sensor_type,
+      latitude: s.zones?.latitude,
+      longitude: s.zones?.longitude,
+      zona: s.zones?.name,
+      municipio: s.municipalities?.name,
+      provincia: s.provinces?.name,
+      has_alert: alertProvinces.includes(s.provinces?.name),
+      mq135_last: mq135 || null,
+      sw420_last: sw420 || null,
     }
+  }))
+
+  setSensors(mapped.filter((s: Sensor) => s.latitude && s.longitude))
+}
 
     fetchWeather()
     fetchRisk()
@@ -188,7 +218,7 @@ export default function Home() {
       fetchSensors()
       fetchRecentLogs()
 
-    }, 5 * 60 * 1000)
+    }, 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
@@ -291,11 +321,11 @@ export default function Home() {
           </div>
           <div>
             <h1 style={{ color: '#fff', fontSize: '1rem', fontWeight: '700', margin: 0, lineHeight: '1.3' }}>
-              Plataforma Inteligente de Monitoramento
-              <span style={{ color: '#22c55e' }}> Preventivo Ambiental com IoT e IA</span>
+              Sistema Inteligente de Alerta Preventivo
+              <span style={{ color: '#22c55e' }}> para regiões vulneráveis em Angola</span>
             </h1>
             <p style={{ color: '#64748b', fontSize: '0.7rem', margin: 0 }}>
-              Sistema Inteligente de Monitoramento Preventivo — Angola
+             Sistema Inteligente de Alerta Preventivo para regiões vulneráveis em Angola
             </p>
           </div>
         </div>
@@ -440,18 +470,28 @@ export default function Home() {
 
           <div style={{ width: '1px', height: '40px', background: '#1e3a5f' }} />
 
-          {/* Contagem de centrais */}
+         {/* Contagem de centrais */}
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <div>
               <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>Centrais</p>
               <div style={{ display: 'flex', gap: '0.8rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
-                  <span style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: '700' }}>{activeSensors.length} Activas</span>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', animation: 'pulse 2s infinite' }} />
+                  <span style={{ color: '#22c55e', fontSize: '0.8rem', fontWeight: '700' }}>
+                    {sensors.filter(s => s.is_active && s.is_online).length} Online
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                  <span style={{ color: '#ef4444', fontSize: '0.8rem', fontWeight: '700' }}>
+                    {sensors.filter(s => s.is_active && !s.is_online).length} Offline
+                  </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#64748b' }} />
-                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{inactiveSensors.length} Inactivas</span>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    {sensors.filter(s => !s.is_active).length} Inactivas
+                  </span>
                 </div>
               </div>
             </div>
@@ -560,96 +600,124 @@ export default function Home() {
 
             {/* PAINEL DA CENTRAL SELECCIONADA */}
             {selectedSensor && (
-              <div style={{
-                background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-                border: `1px solid ${selectedSensor.has_alert ? '#ef444444' : selectedSensor.is_active ? '#22c55e44' : '#33415544'}`,
-                borderRadius: '16px',
-                padding: '1.2rem',
-                color: '#fff',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                  <div>
-                    <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>Central de Monitoramento</p>
-                    <p style={{ color: '#fff', fontWeight: '700', fontSize: '0.95rem', margin: 0 }}>{selectedSensor.name}</p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: selectedSensor.has_alert ? '#ef4444' : selectedSensor.is_active ? '#22c55e' : '#64748b', animation: selectedSensor.is_active ? 'pulse 2s infinite' : 'none' }} />
-                    <span style={{ color: selectedSensor.has_alert ? '#ef4444' : selectedSensor.is_active ? '#22c55e' : '#64748b', fontSize: '0.7rem', fontWeight: '600' }}>
-                      {selectedSensor.has_alert ? 'Em Alerta' : selectedSensor.is_active ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </div>
-                </div>
+  <div style={{
+    background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+    border: `1px solid ${selectedSensor.has_alert ? '#ef444444' : selectedSensor.is_active ? '#22c55e44' : '#33415544'}`,
+    borderRadius: '16px',
+    padding: '1.2rem',
+    color: '#fff',
+    cursor: selectedSensor.is_active ? 'pointer' : 'default',
+  }}
+  onClick={() => {
+    if (selectedSensor.is_active) window.location.href = `/central/${selectedSensor.id}`
+  }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
+      <div>
+        <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.2rem 0' }}>Central de Monitoramento</p>
+        <p style={{ color: '#fff', fontWeight: '700', fontSize: '0.95rem', margin: 0 }}>{selectedSensor.name}</p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: selectedSensor.has_alert ? '#ef4444' : selectedSensor.is_online ? '#22c55e' : '#ef4444', animation: selectedSensor.is_online ? 'pulse 2s infinite' : 'none' }} />
+        <span style={{ color: selectedSensor.has_alert ? '#ef4444' : selectedSensor.is_online ? '#22c55e' : '#ef4444', fontSize: '0.7rem', fontWeight: '600' }}>
+          {!selectedSensor.is_active ? 'Inactiva' : selectedSensor.is_online ? 'Activa' : 'Offline'}
+        </span>
+      </div>
+    </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.8rem' }}>
-                  {[
-                    { label: 'Zona', value: selectedSensor.zona },
-                    { label: 'Município', value: selectedSensor.municipio },
-                    { label: 'Província', value: selectedSensor.provincia },
-                    { label: 'Sensores', value: selectedSensor.sensor_type },
-                  ].map((item) => (
-                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#64748b', fontSize: '0.72rem' }}>{item.label}</span>
-                      <span style={{ color: '#cbd5e1', fontSize: '0.72rem', fontWeight: '600' }}>{item.value}</span>
-                    </div>
-                  ))}
-                </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.8rem' }}>
+      {[
+        { label: 'Zona', value: selectedSensor.zona },
+        { label: 'Município', value: selectedSensor.municipio },
+        { label: 'Província', value: selectedSensor.provincia },
+        { label: 'Tipo', value: selectedSensor.sensor_type },
+      ].map((item) => (
+        <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: '#64748b', fontSize: '0.72rem' }}>{item.label}</span>
+          <span style={{ color: '#cbd5e1', fontSize: '0.72rem', fontWeight: '600' }}>{item.value}</span>
+        </div>
+      ))}
+    </div>
 
-                {/* Painel de sensores */}
-                <div style={{ background: '#060f1e', borderRadius: '8px', padding: '0.7rem', marginBottom: '0.8rem' }}>
-                  <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.5rem 0' }}>Leituras dos Sensores</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    {[
-                      { sensor: 'MQ-135', label: 'Qualidade do Ar', value: selectedSensor.is_active ? 'Sem dados' : '—', unit: 'ADC' },
-                      { sensor: 'SW-420', label: 'Vibração', value: selectedSensor.is_active ? 'Sem vibração' : '—', unit: '' },
-                    ].map((s) => (
-                      <div key={s.sensor} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '600' }}>{s.sensor}</span>
-                          <span style={{ color: '#475569', fontSize: '0.65rem', marginLeft: '0.3rem' }}>{s.label}</span>
-                        </div>
-                        <span style={{ color: selectedSensor.is_active ? '#22c55e' : '#475569', fontSize: '0.72rem', fontWeight: '600' }}>
-                          {s.value} {s.unit}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+    {/* Leituras dos sensores */}
+    <div style={{ background: '#060f1e', borderRadius: '8px', padding: '0.7rem', marginBottom: '0.8rem' }}>
+      <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.5rem 0' }}>Leituras dos Sensores</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '600' }}>MQ-135</span>
+            <span style={{ color: '#475569', fontSize: '0.65rem', marginLeft: '0.3rem' }}>Qualidade do Ar</span>
+          </div>
+          <span style={{
+            color: selectedSensor.mq135_last
+              ? selectedSensor.mq135_last.value > 2500 ? '#ef4444'
+              : selectedSensor.mq135_last.value > 1200 ? '#eab308' : '#22c55e'
+              : '#475569',
+            fontSize: '0.72rem', fontWeight: '600'
+          }}>
+            {selectedSensor.mq135_last ? `${selectedSensor.mq135_last.value} ADC` : 'Sem dados'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '600' }}>SW-420</span>
+            <span style={{ color: '#475569', fontSize: '0.65rem', marginLeft: '0.3rem' }}>Vibração</span>
+          </div>
+          <span style={{
+            color: selectedSensor.sw420_last
+              ? selectedSensor.sw420_last.value >= 2 ? '#ef4444'
+              : selectedSensor.sw420_last.value >= 1 ? '#eab308' : '#22c55e'
+              : '#475569',
+            fontSize: '0.72rem', fontWeight: '600'
+          }}>
+            {selectedSensor.sw420_last
+              ? selectedSensor.sw420_last.value >= 2 ? 'Intensa'
+              : selectedSensor.sw420_last.value >= 1 ? 'Ocasional' : 'Sem vibração'
+              : 'Sem dados'}
+          </span>
+        </div>
+        {selectedSensor.last_seen && (
+          <p style={{ color: '#334155', fontSize: '0.62rem', margin: '0.3rem 0 0 0' }}>
+            Última leitura: {new Date(selectedSensor.last_seen).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+      </div>
+    </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    onClick={() => window.location.href = `/central/${selectedSensor.id}`}
-                    style={{
-                      flex: 1, background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                      border: 'none', color: '#fff', padding: '0.4rem', borderRadius: '8px',
-                      fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600'
-                    }}
-                  >
-                    Ver Central Completa
-                  </button>
-                  <button
-                    onClick={() => setSelectedProvince(selectedSensor.provincia)}
-                    style={{
-                      background: '#1e293b', border: '1px solid #334155',
-                      color: '#94a3b8', padding: '0.4rem 0.6rem', borderRadius: '8px',
-                      fontSize: '0.72rem', cursor: 'pointer'
-                    }}
-                  >
-                    Província
-                  </button>
-                  <button
-                    onClick={() => setSelectedSensor(null)}
-                    style={{
-                      background: '#1e293b', border: '1px solid #334155',
-                      color: '#64748b', padding: '0.4rem 0.6rem', borderRadius: '8px',
-                      fontSize: '0.72rem', cursor: 'pointer'
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-                
-              </div>
-            )}
+    <div style={{ display: 'flex', gap: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => window.location.href = `/central/${selectedSensor.id}`}
+        style={{
+          flex: 1, background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+          border: 'none', color: '#fff', padding: '0.4rem', borderRadius: '8px',
+          fontSize: '0.72rem', cursor: 'pointer', fontWeight: '600'
+        }}
+      >
+        Ver Central Completa
+      </button>
+      <button
+        onClick={() => setSelectedProvince(selectedSensor.provincia)}
+        style={{
+          background: '#1e293b', border: '1px solid #334155',
+          color: '#94a3b8', padding: '0.4rem 0.6rem', borderRadius: '8px',
+          fontSize: '0.72rem', cursor: 'pointer'
+        }}
+      >
+        Província
+      </button>
+      <button
+        onClick={() => setSelectedSensor(null)}
+        style={{
+          background: '#1e293b', border: '1px solid #334155',
+          color: '#64748b', padding: '0.4rem 0.6rem', borderRadius: '8px',
+          fontSize: '0.72rem', cursor: 'pointer'
+        }}
+      >
+        ×
+      </button>
+    </div>
+  </div>
+)}
 
             {/* PAINEL DA PROVÍNCIA SELECCIONADA */}
             {selectedProvince && w && !selectedSensor ? (
@@ -874,7 +942,6 @@ export default function Home() {
             marginTop: '1.5rem'
           }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
-            <span style={{ fontSize: '0.9rem' }}>📡</span>
             <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
               Estado da Comunicação
             </p>
