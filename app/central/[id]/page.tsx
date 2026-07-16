@@ -68,15 +68,15 @@ export default function CentralPage() {
 
       // Buscar dados da central
       const { data: rawSensorData } = await supabase
-            .from('sensors')
-            .select(`
-                id, name, is_active, sensor_type, mac_address, installed_at,
-                zones (name, latitude, longitude),
-                municipalities (name),
-                provinces (id, name, slug)
-            `)
-            .eq('id', sensorId)
-            .single()
+          .from('sensors')
+          .select(`
+              id, name, is_active, is_online, last_seen, sensor_type, mac_address, installed_at,
+              zones (name, latitude, longitude),
+              municipalities (name),
+              provinces (id, name, slug)
+          `)
+          .eq('id', sensorId)
+          .single()
 
             if (!rawSensorData) { setLoading(false); return }
             const sensorData = rawSensorData as unknown as Sensor
@@ -190,7 +190,7 @@ export default function CentralPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: getStatusColor(), animation: sensor.is_active ? 'pulse 2s infinite' : 'none' }} />
           <span style={{ color: getStatusColor(), fontSize: '0.85rem', fontWeight: '600' }}>
-  {!sensor.is_active ? 'Central Inactiva' : sensor.is_online ? 'Central Activa' : 'Central Offline'}
+           {!sensor.is_active ? 'Central Inactiva' : sensor.is_online ? 'Central Activa' : 'Central Offline'}
 </span>
         </div>
       </header>
