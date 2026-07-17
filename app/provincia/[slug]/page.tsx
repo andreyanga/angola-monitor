@@ -87,6 +87,15 @@ interface Report {
   generated_at: string
 }
 
+// Formata uma data vinda da BD garantindo o fuso horário de Angola (Africa/Luanda),
+// mesmo que a string não venha com indicação explícita de timezone (Z / +00:00).
+function formatAO(dateStr: string | null | undefined, opts: Intl.DateTimeFormatOptions) {
+  if (!dateStr) return '—'
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(dateStr)
+  const isoUTC = hasTZ ? dateStr : `${dateStr}Z`
+  return new Date(isoUTC).toLocaleString('pt-AO', { ...opts, timeZone: 'Africa/Luanda' })
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -524,7 +533,7 @@ export default function ProvinciaPage() {
                   </span>
                 </div>
                 <span style={{ color: '#64748b', fontSize: '0.7rem' }}>
-                  Gerado em {new Date(report.generated_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  Gerado em {formatAO(report.generated_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
               <p style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: '1.6', margin: 0 }}>{report.content}</p>
@@ -547,7 +556,7 @@ export default function ProvinciaPage() {
             <ResponsiveContainer width="100%" height={200}>
               <LineChart
                 data={[...history].reverse().map((h) => ({
-                  hora: new Date(h.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                  hora: formatAO(h.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
                   Temp: h.temperature,
                   Humidade: h.humidity,
                   Vento: h.wind_speed,
@@ -575,7 +584,7 @@ export default function ProvinciaPage() {
                   border: i === 0 ? '1px solid #22c55e33' : '1px solid transparent'
                 }}>
                   <span style={{ color: '#64748b', fontSize: '0.72rem' }}>
-                    {new Date(h.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {formatAO(h.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span style={{ color: '#f59e0b', fontWeight: '700', fontSize: '0.8rem' }}>{h.temperature}°C</span>
                   <span style={{ color: '#06b6d4', fontSize: '0.8rem' }}>{h.humidity}%</span>

@@ -19,7 +19,6 @@ const eventIcons: Record<string, string> = {
   alert_generated: '🚨',
   sensor_reading: '📡',
   sensor_offline: '⚫',
-  api_error: '❌',
 }
 
 const severityColor: Record<string, string> = {
@@ -34,6 +33,15 @@ const severityLabel: Record<string, string> = {
   warning: 'ATENÇÃO',
   critical: 'CRÍTICO',
   success: 'OK',
+}
+
+// Formata uma data vinda da BD garantindo o fuso horário de Angola (Africa/Luanda),
+// mesmo que a string não venha com indicação explícita de timezone (Z / +00:00).
+function formatAO(dateStr: string | null | undefined, opts: Intl.DateTimeFormatOptions) {
+  if (!dateStr) return '—'
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(dateStr)
+  const isoUTC = hasTZ ? dateStr : `${dateStr}Z`
+  return new Date(isoUTC).toLocaleString('pt-AO', { ...opts, timeZone: 'Africa/Luanda' })
 }
 
 export default function LogsPage() {
@@ -110,7 +118,7 @@ export default function LogsPage() {
             { key: 'ia_report', label: ' Relatórios IA' },
             { key: 'weather_update', label: ' Meteorologia' },
             { key: 'sensor_reading', label: ' Sensores' },
-            { key: 'api_error', label: '❌ Erros' },
+            
           ].map((f) => (
             <button
               key={f.key}
@@ -174,7 +182,7 @@ export default function LogsPage() {
                   }}
                 >
                   <span style={{ color: '#475569', fontSize: '0.72rem' }}>
-                    {new Date(log.created_at).toLocaleString('pt-AO', {
+                    {formatAO(log.created_at, {
                       day: '2-digit', month: '2-digit',
                       hour: '2-digit', minute: '2-digit', second: '2-digit'
                     })}

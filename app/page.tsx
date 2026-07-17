@@ -61,6 +61,16 @@ interface Sensor {
 const normalize = (str: string) =>
   str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '')
 
+// Formata uma data vinda da BD garantindo o fuso horário de Angola (Africa/Luanda),
+// mesmo que a string não venha com indicação explícita de timezone (Z / +00:00).
+function formatAO(dateStr: string | null | undefined, opts: Intl.DateTimeFormatOptions) {
+  if (!dateStr) return '—'
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(dateStr)
+  const isoUTC = hasTZ ? dateStr : `${dateStr}Z`
+  return new Date(isoUTC).toLocaleString('pt-AO', { ...opts, timeZone: 'Africa/Luanda' })
+}
+
+
 function getRiskLevel(score: number | null) {
   if (score === null) return 'normal'
   if (score >= 60) return 'alerta'
@@ -149,7 +159,7 @@ export default function Home() {
   }
 }
 
-    async function fetchSensors() {
+async function fetchSensors() {
   const { data } = await supabase
     .from('sensors')
     .select(`
@@ -598,7 +608,8 @@ export default function Home() {
           {/* PAINEL LATERAL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-            {/* PAINEL DA CENTRAL SELECCIONADA */}
+            
+ {/* PAINEL DA CENTRAL SELECCIONADA */}
             {selectedSensor && (
   <div style={{
     background: 'linear-gradient(135deg, #0f172a, #1e293b)',
@@ -678,7 +689,7 @@ export default function Home() {
         </div>
         {selectedSensor.last_seen && (
           <p style={{ color: '#334155', fontSize: '0.62rem', margin: '0.3rem 0 0 0' }}>
-            Última leitura: {new Date(selectedSensor.last_seen).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            Última leitura: {formatAO(selectedSensor.last_seen, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
           </p>
         )}
       </div>
@@ -696,7 +707,10 @@ export default function Home() {
         Ver Central Completa
       </button>
       <button
-        onClick={() => setSelectedProvince(selectedSensor.provincia)}
+        onClick={() => {
+          setSelectedProvince(selectedSensor.provincia)
+          setSelectedSensor(null)
+        }}
         style={{
           background: '#1e293b', border: '1px solid #334155',
           color: '#94a3b8', padding: '0.4rem 0.6rem', borderRadius: '8px',
@@ -933,74 +947,76 @@ export default function Home() {
           </div>
 
          {/* ESTADO DA COMUNICAÇÃO */}
-          {systemStatus && (
-          <div style={{
-            background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-            border: '1px solid #1e3a5f',
-            borderRadius: '16px',
-            padding: '1rem 1.5rem',
-            marginTop: '1.5rem'
-          }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
-            <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
-              Estado da Comunicação
-            </p>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <div style={{
-                width: '7px', height: '7px', borderRadius: '50%',
-                background: systemStatus.overall === 'online' ? '#22c55e' : '#eab308',
-                animation: 'pulse 2s infinite'
-              }} />
-              <span style={{
-                color: systemStatus.overall === 'online' ? '#22c55e' : '#eab308',
-                fontSize: '0.65rem', fontWeight: '600'
-              }}>
-                {systemStatus.overall === 'online' ? 'Todos os sistemas operacionais' : 'Atenção'}
-              </span>
-            </div>
-          </div>
+{systemStatus && (
+<div style={{
+  background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+  border: '1px solid #1e3a5f',
+  borderRadius: '16px',
+  padding: '1rem 1.5rem',
+  marginTop: '1.5rem'
+}}>
+<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
+  <p style={{ color: '#fff', fontSize: '0.8rem', fontWeight: '600', margin: 0 }}>
+    Estado da Comunicação
+  </p>
+  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+    <div style={{
+      width: '7px', height: '7px', borderRadius: '50%',
+      background: systemStatus.overall === 'online' ? '#22c55e' : '#eab308',
+      animation: 'pulse 2s infinite'
+    }} />
+    <span style={{
+      color: systemStatus.overall === 'online' ? '#22c55e' : '#eab308',
+      fontSize: '0.65rem', fontWeight: '600'
+    }}>
+      {systemStatus.overall === 'online' ? 'Todos os sistemas operacionais' : 'Atenção'}
+    </span>
+  </div>
+</div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {Object.values(systemStatus.services).map((s: any) => (
-              <div key={s.label} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '0.4rem 0.6rem',
-                background: '#0f172a',
-                borderRadius: '8px',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{
-                    width: '7px', height: '7px', borderRadius: '50%',
-                    background: s.status === 'online' ? '#22c55e' : s.status === 'degraded' ? '#eab308' : '#ef4444'
-                  }} />
-                  <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>{s.label}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  {s.details && (
-                    <span style={{ color: '#475569', fontSize: '0.65rem' }}>{s.details}</span>
-                  )}
-                  {s.latency !== null && (
-                    <span style={{ color: '#475569', fontSize: '0.65rem' }}>{s.latency}ms</span>
-                  )}
-                  <span style={{
-                    color: s.status === 'online' ? '#22c55e' : s.status === 'degraded' ? '#eab308' : '#ef4444',
-                    fontSize: '0.65rem', fontWeight: '700',
-                    background: s.status === 'online' ? '#22c55e22' : s.status === 'degraded' ? '#eab30822' : '#ef444422',
-                    padding: '0.1rem 0.4rem', borderRadius: '4px'
-                  }}>
-                    {s.status === 'online' ? 'ONLINE' : s.status === 'degraded' ? 'DEGRADADO' : 'OFFLINE'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+<div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+  {Object.values(systemStatus.services)
+    .filter((s: any) => s.label !== 'Central Local')
+    .map((s: any) => (
+    <div key={s.label} style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0.4rem 0.6rem',
+      background: '#0f172a',
+      borderRadius: '8px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{
+          width: '7px', height: '7px', borderRadius: '50%',
+          background: s.status === 'online' ? '#22c55e' : s.status === 'degraded' ? '#eab308' : '#ef4444'
+        }} />
+        <span style={{ color: '#cbd5e1', fontSize: '0.75rem' }}>{s.label}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+        {s.details && (
+          <span style={{ color: '#475569', fontSize: '0.65rem' }}>{s.details}</span>
+        )}
+        {s.latency !== null && (
+          <span style={{ color: '#475569', fontSize: '0.65rem' }}>{s.latency}ms</span>
+        )}
+        <span style={{
+          color: s.status === 'online' ? '#22c55e' : s.status === 'degraded' ? '#eab308' : '#ef4444',
+          fontSize: '0.65rem', fontWeight: '700',
+          background: s.status === 'online' ? '#22c55e22' : s.status === 'degraded' ? '#eab30822' : '#ef444422',
+          padding: '0.1rem 0.4rem', borderRadius: '4px'
+        }}>
+          {s.status === 'online' ? 'ONLINE' : s.status === 'degraded' ? 'DEGRADADO' : 'OFFLINE'}
+        </span>
+      </div>
+    </div>
+  ))}
+</div>
 
-          <p style={{ color: '#334155', fontSize: '0.6rem', margin: '0.5rem 0 0 0', textAlign: 'right' }}>
-            Verificado às {systemStatus.checked_at ? new Date(systemStatus.checked_at).toLocaleTimeString('pt-AO') : '--'}
-          </p>
-      
-          </div>
-          )}
+<p style={{ color: '#334155', fontSize: '0.6rem', margin: '0.5rem 0 0 0', textAlign: 'right' }}>
+  Verificado às {systemStatus.checked_at ? new Date(systemStatus.checked_at).toLocaleTimeString('pt-AO') : '--'}
+</p>
+
+</div>
+)}
 
           {/* LINHA TEMPORAL DE EVENTOS */}
         <div style={{
@@ -1087,7 +1103,7 @@ export default function Home() {
                           </p>
                         )}
                         <span style={{ color: '#334155', fontSize: '0.62rem' }}>
-                          {new Date(log.created_at).toLocaleString('pt-AO', {
+                          {formatAO(log.created_at, {
                             day: '2-digit', month: '2-digit',
                             hour: '2-digit', minute: '2-digit', second: '2-digit'
                           })}

@@ -39,6 +39,15 @@ interface WeatherData {
   recorded_at: string
 }
 
+// Formata uma data vinda da BD garantindo o fuso horário de Angola (Africa/Luanda),
+// mesmo que a string não venha com indicação explícita de timezone (Z / +00:00).
+function formatAO(dateStr: string | null | undefined, opts: Intl.DateTimeFormatOptions) {
+  if (!dateStr) return '—'
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(dateStr)
+  const isoUTC = hasTZ ? dateStr : `${dateStr}Z`
+  return new Date(isoUTC).toLocaleString('pt-AO', { ...opts, timeZone: 'Africa/Luanda' })
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -136,7 +145,7 @@ export default function CentralPage() {
 
   // Dados para gráfico de histórico
   const chartData = [...readings].reverse().slice(-24).map((r) => ({
-    hora: new Date(r.recorded_at).toLocaleString('pt-AO', { hour: '2-digit', minute: '2-digit' }),
+    hora: formatAO(r.recorded_at, { hour: '2-digit', minute: '2-digit' }),
     Valor: r.value,
     tipo: r.sensor_type,
   }))
@@ -273,7 +282,7 @@ export default function CentralPage() {
                   </p>
                   {lastMQ135 && (
                     <p style={{ color: '#334155', fontSize: '0.65rem', margin: '0.3rem 0 0 0' }}>
-                      Última leitura: {new Date(lastMQ135.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      Última leitura: {formatAO(lastMQ135.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}
                 </div>
@@ -307,7 +316,7 @@ export default function CentralPage() {
                   </p>
                   {lastSW420 && (
                     <p style={{ color: '#334155', fontSize: '0.65rem', margin: '0.3rem 0 0 0' }}>
-                      Última leitura: {new Date(lastSW420.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      Última leitura: {formatAO(lastSW420.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}
                 </div>
@@ -332,7 +341,7 @@ export default function CentralPage() {
                     { label: 'Prob. Chuva', value: `${weather.rain_probability ?? 0}%`, icon: '🌧️', color: '#3b82f6' },
                     { label: 'Vento', value: `${weather.wind_speed} m/s`, icon: '💨', color: '#8b5cf6' },
                     { label: 'Humidade', value: `${weather.humidity}%`, icon: '💧', color: '#06b6d4' },
-                    { label: 'Actualizado', value: new Date(weather.recorded_at).toLocaleString('pt-AO', { hour: '2-digit', minute: '2-digit' }), icon: '🕐', color: '#22c55e' },
+                    { label: 'Actualizado', value: formatAO(weather.recorded_at, { hour: '2-digit', minute: '2-digit' }), icon: '🕐', color: '#22c55e' },
                   ].map((item) => (
                     <div key={item.label} style={{ background: '#0f172a', borderRadius: '10px', padding: '0.8rem', textAlign: 'center', border: `1px solid ${item.color}22` }}>
                       <p style={{ fontSize: '1.2rem', margin: '0 0 0.2rem 0' }}>{item.icon}</p>
@@ -378,7 +387,7 @@ export default function CentralPage() {
                   border: i === 0 ? '1px solid #22c55e33' : '1px solid transparent'
                 }}>
                   <span style={{ color: '#64748b', fontSize: '0.72rem' }}>
-                    {new Date(r.recorded_at).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {formatAO(r.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>{r.sensor_type}</span>
                   <span style={{ color: '#22c55e', fontWeight: '700', fontSize: '0.8rem' }}>{r.value} {r.unit}</span>
@@ -404,7 +413,7 @@ export default function CentralPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
             {[
               { label: 'Endereço MAC', value: sensor.mac_address || 'N/D' },
-              { label: 'Data de Instalação', value: sensor.installed_at ? new Date(sensor.installed_at).toLocaleDateString('pt-AO') : 'N/D' },
+              { label: 'Data de Instalação', value: sensor.installed_at ? formatAO(sensor.installed_at, { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/D' },
               { label: 'Total de Leituras', value: readings.length.toString() },
             ].map((item) => (
               <div key={item.label}>

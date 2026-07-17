@@ -5,6 +5,15 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 
+// Formata uma data vinda da BD garantindo o fuso horário de Angola (Africa/Luanda),
+// mesmo que a string não venha com indicação explícita de timezone (Z / +00:00).
+function formatAO(dateStr: string | null | undefined, opts: Intl.DateTimeFormatOptions) {
+  if (!dateStr) return '—'
+  const hasTZ = /Z$|[+-]\d{2}:\d{2}$/.test(dateStr)
+  const isoUTC = hasTZ ? dateStr : `${dateStr}Z`
+  return new Date(isoUTC).toLocaleString('pt-AO', { ...opts, timeZone: 'Africa/Luanda' })
+}
+
 interface Municipality {
   id: number
   name: string
@@ -242,7 +251,7 @@ export default function MunicipioPage() {
                   { label: 'Chuva', value: `${weather.rain_probability ?? 0}%`, icon: '🌧️', color: '#3b82f6' },
                   { label: 'Vento', value: `${weather.wind_speed} m/s`, icon: '💨', color: '#8b5cf6' },
                   { label: 'Humidade', value: `${weather.humidity}%`, icon: '💧', color: '#06b6d4' },
-                  { label: 'Hora', value: new Date(weather.recorded_at).toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' }), icon: '🕐', color: '#22c55e' },
+                  { label: 'Hora', value: formatAO(weather.recorded_at, { hour: '2-digit', minute: '2-digit' }), icon: '🕐', color: '#22c55e' },
                 ].map((item) => (
                   <div key={item.label} style={{ background: '#0f172a', borderRadius: '8px', padding: '0.7rem', textAlign: 'center' }}>
                     <p style={{ fontSize: '1.1rem', margin: '0 0 0.2rem 0' }}>{item.icon}</p>
@@ -294,7 +303,7 @@ export default function MunicipioPage() {
                               </div>
                               {sensor.last_seen && (
                                 <span style={{ color: '#334155', fontSize: '0.62rem' }}>
-                                  Visto: {new Date(sensor.last_seen).toLocaleString('pt-AO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                  Visto: {formatAO(sensor.last_seen, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               )}
                             </div>
