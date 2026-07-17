@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { log } from '@/lib/logger'
 
 export async function GET() {
-  const TIMEOUT_MINUTES = 3 // se não chegar dados em 3 min → offline
+  const TIMEOUT_MINUTES = 2 // se não chegar dados em 3 min → offline
   const now = new Date()
   const results = []
 
