@@ -157,15 +157,16 @@ export default function CentralPage() {
 }
 
   const getMQ135Status = (value: number) => {
-    if (value > 2500) return { label: 'ALTO', color: '#ef4444' }
-    if (value > 1200) return { label: 'MODERADO', color: '#eab308' }
-    return { label: 'BAIXO', color: '#22c55e' }
+    if (value > 3500) return { label: 'PERIGOSO', color: '#7f1d1d' }
+    if (value > 2500) return { label: 'MÁ', color: '#ef4444' }
+    if (value > 1200) return { label: 'MODERADA', color: '#eab308' }
+    return { label: 'BOA', color: '#22c55e' }
   }
 
   const getSW420Status = (value: number) => {
-    if (value >= 2) return { label: 'Vibração Intensa', color: '#ef4444' }
-    if (value >= 1) return { label: 'Vibração Ocasional', color: '#eab308' }
-    return { label: 'Sem Vibração', color: '#22c55e' }
+    if (value >= 2) return { label: 'INTENSA', color: '#ef4444' }
+    if (value >= 1) return { label: 'OCASIONAL', color: '#eab308' }
+    return { label: 'NORMAL', color: '#22c55e' }
   }
 
   return (
@@ -275,16 +276,21 @@ export default function CentralPage() {
                     )}
                   </div>
                   <p style={{ color: lastMQ135 ? getMQ135Status(lastMQ135.value).color : '#475569', fontSize: '2rem', fontWeight: '800', margin: '0 0 0.2rem 0' }}>
-                    {lastMQ135 ? `${lastMQ135.value} ADC` : '— ADC'}
-                  </p>
-                  <p style={{ color: '#475569', fontSize: '0.65rem', margin: 0 }}>
-                    Faixas: 0–1200 Baixo · 1201–2500 Moderado · &gt;2500 Alto
-                  </p>
-                  {lastMQ135 && (
-                    <p style={{ color: '#334155', fontSize: '0.65rem', margin: '0.3rem 0 0 0' }}>
-                      Última leitura: {formatAO(lastMQ135.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
+  {lastMQ135 ? getMQ135Status(lastMQ135.value).label : '—'}
+</p>
+{lastMQ135 && (
+  <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 0.1rem 0' }}>
+    {lastMQ135.value} ADC
+  </p>
+)}
+<p style={{ color: '#475569', fontSize: '0.65rem', margin: 0 }}>
+  Faixas: 0–1200 Boa · 1201–2500 Moderada · 2501–3500 Má · &gt;3500 Perigoso
+</p>
+{lastMQ135 && (
+  <p style={{ color: '#334155', fontSize: '0.65rem', margin: '0.3rem 0 0 0' }}>
+    Última leitura: {formatAO(lastMQ135.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+  </p>
+)}
                 </div>
 
                 {/* SW-420 */}
@@ -309,16 +315,21 @@ export default function CentralPage() {
                     )}
                   </div>
                   <p style={{ color: lastSW420 ? getSW420Status(lastSW420.value).color : '#475569', fontSize: '2rem', fontWeight: '800', margin: '0 0 0.2rem 0' }}>
-                    {lastSW420 ? getSW420Status(lastSW420.value).label : '— Sem dados'}
-                  </p>
-                  <p style={{ color: '#475569', fontSize: '0.65rem', margin: 0 }}>
-                    Faixas: 0 Sem vibração · 1 Ocasional · 2+ Intensa
-                  </p>
-                  {lastSW420 && (
-                    <p style={{ color: '#334155', fontSize: '0.65rem', margin: '0.3rem 0 0 0' }}>
-                      Última leitura: {formatAO(lastSW420.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
+  {lastSW420 ? getSW420Status(lastSW420.value).label : '— Sem dados'}
+</p>
+{lastSW420 && (
+  <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 0.1rem 0' }}>
+    valor: {lastSW420.value}
+  </p>
+)}
+<p style={{ color: '#475569', fontSize: '0.65rem', margin: 0 }}>
+  Faixas: 0 Normal · 1 Ocasional · 2+ Intensa
+</p>
+{lastSW420 && (
+  <p style={{ color: '#334155', fontSize: '0.65rem', margin: '0.3rem 0 0 0' }}>
+    Última leitura: {formatAO(lastSW420.recorded_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+  </p>
+)}
                 </div>
               </div>
             )}

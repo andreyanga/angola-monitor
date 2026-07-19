@@ -156,15 +156,16 @@ export default function MunicipioPage() {
   }
 
   const getMQ135Status = (value: number) => {
-    if (value > 2500) return { label: 'ALTO', color: '#ef4444' }
-    if (value > 1200) return { label: 'MODERADO', color: '#eab308' }
-    return { label: 'BAIXO', color: '#22c55e' }
+    if (value > 3500) return { label: 'PERIGOSO', color: '#7f1d1d' }
+    if (value > 2500) return { label: 'MÁ', color: '#ef4444' }
+    if (value > 1200) return { label: 'MODERADA', color: '#eab308' }
+    return { label: 'BOA', color: '#22c55e' }
   }
 
   const getSW420Status = (value: number) => {
-    if (value >= 2) return { label: 'Intensa', color: '#ef4444' }
-    if (value >= 1) return { label: 'Ocasional', color: '#eab308' }
-    return { label: 'Normal', color: '#22c55e' }
+    if (value >= 2) return { label: 'INTENSA', color: '#ef4444' }
+    if (value >= 1) return { label: 'OCASIONAL', color: '#eab308' }
+    return { label: 'NORMAL', color: '#22c55e' }
   }
 
   return (

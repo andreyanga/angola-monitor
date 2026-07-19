@@ -654,38 +654,60 @@ async function fetchSensors() {
     <div style={{ background: '#060f1e', borderRadius: '8px', padding: '0.7rem', marginBottom: '0.8rem' }}>
       <p style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', margin: '0 0 0.5rem 0' }}>Leituras dos Sensores</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        {/* MQ-135 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '600' }}>MQ-135</span>
             <span style={{ color: '#475569', fontSize: '0.65rem', marginLeft: '0.3rem' }}>Qualidade do Ar</span>
           </div>
-          <span style={{
-            color: selectedSensor.mq135_last
-              ? selectedSensor.mq135_last.value > 2500 ? '#ef4444'
-              : selectedSensor.mq135_last.value > 1200 ? '#eab308' : '#22c55e'
-              : '#475569',
-            fontSize: '0.72rem', fontWeight: '600'
-          }}>
-            {selectedSensor.mq135_last ? `${selectedSensor.mq135_last.value} ADC` : 'Sem dados'}
-          </span>
+          <div style={{ textAlign: 'right' }}>
+            {selectedSensor.mq135_last ? (
+              <>
+                <p style={{
+                  color: selectedSensor.mq135_last.value > 3500 ? '#7f1d1d'
+                    : selectedSensor.mq135_last.value > 2500 ? '#ef4444'
+                    : selectedSensor.mq135_last.value > 1200 ? '#eab308' : '#22c55e',
+                  fontSize: '0.78rem', fontWeight: '700', margin: 0
+                }}>
+                  {selectedSensor.mq135_last.value > 3500 ? 'PERIGOSO'
+                    : selectedSensor.mq135_last.value > 2500 ? 'MÁ'
+                    : selectedSensor.mq135_last.value > 1200 ? 'MODERADA' : 'BOA'}
+                </p>
+                <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
+                  {selectedSensor.mq135_last.value} ADC
+                </p>
+              </>
+            ) : (
+              <span style={{ color: '#475569', fontSize: '0.72rem' }}>Sem dados</span>
+            )}
+          </div>
         </div>
+
+        {/* SW-420 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: '600' }}>SW-420</span>
             <span style={{ color: '#475569', fontSize: '0.65rem', marginLeft: '0.3rem' }}>Vibração</span>
           </div>
-          <span style={{
-            color: selectedSensor.sw420_last
-              ? selectedSensor.sw420_last.value >= 2 ? '#ef4444'
-              : selectedSensor.sw420_last.value >= 1 ? '#eab308' : '#22c55e'
-              : '#475569',
-            fontSize: '0.72rem', fontWeight: '600'
-          }}>
-            {selectedSensor.sw420_last
-              ? selectedSensor.sw420_last.value >= 2 ? 'Intensa'
-              : selectedSensor.sw420_last.value >= 1 ? 'Ocasional' : 'Sem vibração'
-              : 'Sem dados'}
-          </span>
+          <div style={{ textAlign: 'right' }}>
+            {selectedSensor.sw420_last ? (
+              <>
+                <p style={{
+                  color: selectedSensor.sw420_last.value >= 2 ? '#ef4444'
+                    : selectedSensor.sw420_last.value >= 1 ? '#eab308' : '#22c55e',
+                  fontSize: '0.78rem', fontWeight: '700', margin: 0
+                }}>
+                  {selectedSensor.sw420_last.value >= 2 ? 'INTENSA'
+                    : selectedSensor.sw420_last.value >= 1 ? 'OCASIONAL' : 'NORMAL'}
+                </p>
+                <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
+                  valor: {selectedSensor.sw420_last.value}
+                </p>
+              </>
+            ) : (
+              <span style={{ color: '#475569', fontSize: '0.72rem' }}>Sem dados</span>
+            )}
+          </div>
         </div>
         {selectedSensor.last_seen && (
           <p style={{ color: '#334155', fontSize: '0.62rem', margin: '0.3rem 0 0 0' }}>
