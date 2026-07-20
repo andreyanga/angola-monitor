@@ -662,24 +662,24 @@ async function fetchSensors() {
           </div>
           <div style={{ textAlign: 'right' }}>
             {selectedSensor.mq135_last ? (
-              <>
-                <p style={{
-                  color: selectedSensor.mq135_last.value > 3500 ? '#7f1d1d'
-                    : selectedSensor.mq135_last.value > 2500 ? '#ef4444'
-                    : selectedSensor.mq135_last.value > 1200 ? '#eab308' : '#22c55e',
-                  fontSize: '0.78rem', fontWeight: '700', margin: 0
-                }}>
-                  {selectedSensor.mq135_last.value > 3500 ? 'PERIGOSO'
-                    : selectedSensor.mq135_last.value > 2500 ? 'MÁ'
-                    : selectedSensor.mq135_last.value > 1200 ? 'MODERADA' : 'BOA'}
-                </p>
-                <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
-                  {selectedSensor.mq135_last.value} ADC
-                </p>
-              </>
-            ) : (
-              <span style={{ color: '#475569', fontSize: '0.72rem' }}>Sem dados</span>
-            )}
+  <>
+    <p style={{
+      color: selectedSensor.mq135_last.value >= 80 ? '#7f1d1d'
+        : selectedSensor.mq135_last.value >= 60 ? '#ef4444'
+        : selectedSensor.mq135_last.value >= 40 ? '#eab308' : '#22c55e',
+      fontSize: '0.78rem', fontWeight: '700', margin: 0
+    }}>
+      {selectedSensor.mq135_last.value >= 80 ? 'PERIGOSO'
+        : selectedSensor.mq135_last.value >= 60 ? 'MÁ'
+        : selectedSensor.mq135_last.value >= 40 ? 'MODERADA' : 'BOA'}
+    </p>
+    <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
+      {selectedSensor.mq135_last.value}%
+    </p>
+  </>
+) : (
+  <span style={{ color: '#475569', fontSize: '0.72rem' }}>Sem dados</span>
+)}
           </div>
         </div>
 
@@ -691,22 +691,22 @@ async function fetchSensors() {
           </div>
           <div style={{ textAlign: 'right' }}>
             {selectedSensor.sw420_last ? (
-              <>
-                <p style={{
-                  color: selectedSensor.sw420_last.value >= 2 ? '#ef4444'
-                    : selectedSensor.sw420_last.value >= 1 ? '#eab308' : '#22c55e',
-                  fontSize: '0.78rem', fontWeight: '700', margin: 0
-                }}>
-                  {selectedSensor.sw420_last.value >= 2 ? 'INTENSA'
-                    : selectedSensor.sw420_last.value >= 1 ? 'OCASIONAL' : 'NORMAL'}
-                </p>
-                <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
-                  valor: {selectedSensor.sw420_last.value}
-                </p>
-              </>
-            ) : (
-              <span style={{ color: '#475569', fontSize: '0.72rem' }}>Sem dados</span>
-            )}
+  <>
+    <p style={{
+      color: selectedSensor.sw420_last.value >= 60 ? '#ef4444'
+        : selectedSensor.sw420_last.value >= 30 ? '#eab308' : '#22c55e',
+      fontSize: '0.78rem', fontWeight: '700', margin: 0
+    }}>
+      {selectedSensor.sw420_last.value >= 60 ? 'INTENSA'
+        : selectedSensor.sw420_last.value >= 30 ? 'OCASIONAL' : 'NORMAL'}
+    </p>
+    <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
+      valor: {selectedSensor.sw420_last.value}%
+    </p>
+  </>
+) : (
+  <span style={{ color: '#475569', fontSize: '0.72rem' }}>Sem dados</span>
+)}
           </div>
         </div>
         {selectedSensor.last_seen && (

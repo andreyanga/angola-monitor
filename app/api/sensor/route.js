@@ -50,9 +50,13 @@ export async function POST(request) {
         .eq('is_active', true)
     }
 
-    // Calcular status do MQ135
-    const mq135Status = mq135 > 2500 ? 'alerta' : mq135 > 1200 ? 'atencao' : 'normal'
-    const sw420Status = sw420 >= 2 ? 'alerta' : sw420 >= 1 ? 'atencao' : 'normal'
+    // Calcular status do MQ135 (índice 0-100 já convertido pelo ESP32)
+    // Faixas: <20 Boa | 20-39 Moderada | 40-59 Ruim | 60-79 Muito Ruim | >=80 Perigosa
+    const mq135Status = mq135 >= 60 ? 'alerta' : mq135 >= 40 ? 'atencao' : 'normal'
+
+    // Calcular status do SW420 (índice 0-100 já convertido pelo ESP32)
+    // Faixas: 0 Sem vibracao | 1-29 Baixa | 30-59 Media | 60-84 Alta | >=85 Muito Alta
+    const sw420Status = sw420 >= 60 ? 'alerta' : sw420 >= 30 ? 'atencao' : 'normal'
 
     // Guardar leituras
     if (mq135 !== undefined) {
@@ -63,7 +67,7 @@ export async function POST(request) {
         zone_id: sensor.zone_id,
         sensor_type: 'MQ-135',
         value: mq135,
-        unit: 'ADC',
+        unit: '%',
         status: mq135Status,
       })
     }
@@ -76,7 +80,7 @@ export async function POST(request) {
         zone_id: sensor.zone_id,
         sensor_type: 'SW-420',
         value: sw420,
-        unit: '',
+        unit: '%',
         status: sw420Status,
       })
     }
@@ -85,7 +89,7 @@ export async function POST(request) {
     await log({
       event_type: 'sensor_reading',
       title: `Leitura recebida — ${sensor.name}`,
-      description: `MQ-135: ${mq135} ADC (${mq135Status}) | SW-420: ${sw420} (${sw420Status})`,
+      description: `MQ-135: ${mq135}% (${mq135Status}) | SW-420: ${sw420}% (${sw420Status})`,
       province_id: sensor.province_id,
       sensor_id: sensor.id,
       severity: mq135Status === 'alerta' || sw420Status === 'alerta' ? 'critical'
@@ -100,6 +104,7 @@ export async function POST(request) {
         .from('alerts')
         .update({ is_active: false, resolved_at: now })
         .eq('province_id', sensor.province_id)
+        .eq('type', tipoPerigo)
         .eq('is_active', true)
 
       await supabase.from('alerts').insert({
@@ -107,7 +112,7 @@ export async function POST(request) {
         type: tipoPerigo,
         severity: 'alerta',
         title: `${tipoPerigo} — ${sensor.name}`,
-        description: `MQ-135: ${mq135} ADC | SW-420: ${sw420}. Verificar imediatamente.`,
+        description: `MQ-135: ${mq135}% | SW-420: ${sw420}%. Verificar imediatamente.`,
         is_active: true,
       })
     }

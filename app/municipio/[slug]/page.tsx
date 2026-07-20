@@ -40,7 +40,8 @@ interface Sensor {
   is_online: boolean
   last_seen: string
   mac_address: string
-  last_reading?: SensorReading
+  mq135_last?: { value: number; unit: string; status: string; recorded_at: string } | null
+  sw420_last?: { value: number; unit: string; status: string; recorded_at: string } | null
 }
 
 interface SensorReading {
@@ -97,14 +98,25 @@ export default function MunicipioPage() {
             ...zone,
             sensors: await Promise.all(
               zone.sensors.map(async (sensor: Sensor) => {
-                const { data: reading } = await supabase
+                const { data: mq135 } = await supabase
                   .from('sensor_readings')
                   .select('*')
                   .eq('sensor_id', sensor.id)
+                  .eq('sensor_type', 'MQ-135')
                   .order('recorded_at', { ascending: false })
                   .limit(1)
                   .maybeSingle()
-                return { ...sensor, last_reading: reading || null }
+
+                const { data: sw420 } = await supabase
+                  .from('sensor_readings')
+                  .select('*')
+                  .eq('sensor_id', sensor.id)
+                  .eq('sensor_type', 'SW-420')
+                  .order('recorded_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle()
+
+                return { ...sensor, mq135_last: mq135 || null, sw420_last: sw420 || null }
               })
             )
           }))
@@ -155,18 +167,18 @@ export default function MunicipioPage() {
     return 'Online'
   }
 
-  const getMQ135Status = (value: number) => {
-    if (value > 3500) return { label: 'PERIGOSO', color: '#7f1d1d' }
-    if (value > 2500) return { label: 'MÁ', color: '#ef4444' }
-    if (value > 1200) return { label: 'MODERADA', color: '#eab308' }
-    return { label: 'BOA', color: '#22c55e' }
-  }
+ const getMQ135Status = (value: number) => {
+  if (value >= 80) return { label: 'PERIGOSO', color: '#7f1d1d' }
+  if (value >= 60) return { label: 'MÁ', color: '#ef4444' }
+  if (value >= 40) return { label: 'MODERADA', color: '#eab308' }
+  return { label: 'BOA', color: '#22c55e' }
+}
 
-  const getSW420Status = (value: number) => {
-    if (value >= 2) return { label: 'INTENSA', color: '#ef4444' }
-    if (value >= 1) return { label: 'OCASIONAL', color: '#eab308' }
-    return { label: 'NORMAL', color: '#22c55e' }
-  }
+const getSW420Status = (value: number) => {
+  if (value >= 60) return { label: 'INTENSA', color: '#ef4444' }
+  if (value >= 30) return { label: 'OCASIONAL', color: '#eab308' }
+  return { label: 'NORMAL', color: '#22c55e' }
+}
 
   return (
     <main style={{ background: '#060f1e', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -311,23 +323,37 @@ export default function MunicipioPage() {
                           </div>
 
                           {/* Leituras */}
-                          {sensor.last_reading ? (
+                          {(sensor.mq135_last || sensor.sw420_last) ? (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                               <div style={{ background: '#0f172a', borderRadius: '8px', padding: '0.6rem', textAlign: 'center' }}>
                                 <p style={{ color: '#64748b', fontSize: '0.62rem', margin: '0 0 0.2rem 0' }}>MQ-135</p>
-                                <p style={{ color: getMQ135Status(sensor.last_reading.value).color, fontWeight: '700', fontSize: '0.9rem', margin: '0 0 0.1rem 0' }}>
-                                  {sensor.last_reading.value} ADC
-                                </p>
-                                <p style={{ color: getMQ135Status(sensor.last_reading.value).color, fontSize: '0.62rem', margin: 0 }}>
-                                  {getMQ135Status(sensor.last_reading.value).label}
-                                </p>
+                                {sensor.mq135_last ? (
+                                  <>
+                                    <p style={{ color: getMQ135Status(sensor.mq135_last.value).color, fontWeight: '700', fontSize: '0.9rem', margin: '0 0 0.1rem 0' }}>
+                                      {getMQ135Status(sensor.mq135_last.value).label}
+                                    </p>
+                                    <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
+                                      {sensor.mq135_last.value}%
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>Sem dados</p>
+                                )}
                               </div>
                               <div style={{ background: '#0f172a', borderRadius: '8px', padding: '0.6rem', textAlign: 'center' }}>
                                 <p style={{ color: '#64748b', fontSize: '0.62rem', margin: '0 0 0.2rem 0' }}>SW-420</p>
-                                <p style={{ color: getSW420Status(sensor.last_reading.value).color, fontWeight: '700', fontSize: '0.9rem', margin: '0 0 0.1rem 0' }}>
-                                  {getSW420Status(sensor.last_reading.value).label}
-                                </p>
-                                <p style={{ color: '#64748b', fontSize: '0.62rem', margin: 0 }}>Vibração</p>
+                                {sensor.sw420_last ? (
+                                  <>
+                                    <p style={{ color: getSW420Status(sensor.sw420_last.value).color, fontWeight: '700', fontSize: '0.9rem', margin: '0 0 0.1rem 0' }}>
+                                      {getSW420Status(sensor.sw420_last.value).label}
+                                    </p>
+                                    <p style={{ color: '#475569', fontSize: '0.6rem', margin: 0 }}>
+                                      valor: {sensor.sw420_last.value}%
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>Sem dados</p>
+                                )}
                               </div>
                             </div>
                           ) : (

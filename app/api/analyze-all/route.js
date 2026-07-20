@@ -63,7 +63,7 @@ export async function GET() {
 
 {
   "relatorio": "relatório técnico curto em português de Angola, máximo 4 frases, destacando riscos preventivos e recomendações práticas baseados APENAS nos dados fornecidos",
-  "tipo_perigo": "baseado APENAS nos dados fornecidos (não inventes): Chuva Intensa (APENAS se prob_chuva > 40%), Calor Extremo (APENAS se temp > 28°C), Vento Forte (APENAS se vento > 5 m/s), Humidade Elevada (APENAS se humidade > 85%), Seca (APENAS se humidade < 40%), Poluição do Ar (APENAS se MQ135 > 1200), ou Nenhum",
+  "tipo_perigo": "baseado APENAS nos dados fornecidos (não inventes): Chuva Intensa (APENAS se prob_chuva > 40%), Calor Extremo (APENAS se temp > 28°C), Vento Forte (APENAS se vento > 5 m/s), Humidade Elevada (APENAS se humidade > 85%), Seca (APENAS se humidade < 40%), Poluição do Ar (APENAS se MQ135 >= 60%), ou Nenhum",
   "nivel_risco": "${ira.level}",
   "mitigacao": "uma frase curta e prática com a principal recomendação de mitigação baseada no perigo identificado"
 }
@@ -73,7 +73,7 @@ Temperatura: ${weather.temperature}°C ${weather.temperature > 32 ? '→ ALTO' :
 Humidade: ${weather.humidity}% ${weather.humidity > 85 ? '→ ALTO' : weather.humidity >= 70 ? '→ MODERADO' : '→ BAIXO'}
 Vento: ${weather.wind_speed} m/s ${weather.wind_speed > 10 ? '→ ALTO' : weather.wind_speed >= 5 ? '→ MODERADO' : '→ BAIXO'}
 Probabilidade de Chuva (próximas 24h): ${rainProb}% ${rainProb > 70 ? '→ ALTO' : rainProb >= 40 ? '→ MODERADO' : '→ BAIXO'}
-Qualidade do Ar MQ135: ${mq135Value} ADC ${mq135Value > 2500 ? '→ ALTO' : mq135Value > 1200 ? '→ MODERADO' : '→ BAIXO'}
+Qualidade do Ar MQ135: ${mq135Value}% ${mq135Value >= 60 ? '→ ALTO' : mq135Value >= 40 ? '→ MODERADO' : '→ BAIXO'}
 Condição actual: ${weather.description}
 IRA calculado: ${ira.score}/100 (${ira.label})
 
