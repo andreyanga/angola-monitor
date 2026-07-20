@@ -140,15 +140,26 @@ export default function CentralPage() {
     r.sensor_type?.includes('SW') || r.sensor_type?.includes('sw') || r.sensor_type?.includes('420')
   )
 
-  const lastMQ135 = mq135Readings[0]
-  const lastSW420 = sw420Readings[0]
+const lastMQ135 = mq135Readings[0]
+const lastSW420 = sw420Readings[0]
 
-  // Dados para gráfico de histórico
-  const chartData = [...readings].reverse().slice(-24).map((r) => ({
-    hora: formatAO(r.recorded_at, { hour: '2-digit', minute: '2-digit' }),
-    Valor: r.value,
-    tipo: r.sensor_type,
-  }))
+// Dados para gráfico de histórico (MQ-135 e SW-420 separados por coluna)
+const mq135Chart = [...mq135Readings].reverse().slice(-24).map((r) => ({
+  hora: formatAO(r.recorded_at, { hour: '2-digit', minute: '2-digit' }),
+  'MQ-135': r.value,
+}))
+const sw420Chart = [...sw420Readings].reverse().slice(-24).map((r) => ({
+  hora: formatAO(r.recorded_at, { hour: '2-digit', minute: '2-digit' }),
+  'SW-420': r.value,
+}))
+const chartMap: Record<string, any> = {}
+mq135Chart.forEach((d) => {
+  chartMap[d.hora] = { ...chartMap[d.hora], hora: d.hora, 'MQ-135': d['MQ-135'] }
+})
+sw420Chart.forEach((d) => {
+  chartMap[d.hora] = { ...chartMap[d.hora], hora: d.hora, 'SW-420': d['SW-420'] }
+})
+const chartData = Object.values(chartMap)
 
   const getStatusColor = () => {
   if (!sensor.is_active) return '#64748b'
@@ -370,7 +381,7 @@ export default function CentralPage() {
           </div>
         </div>
 
-        {/* HISTÓRICO DE LEITURAS */}
+       {/* HISTÓRICO DE LEITURAS */}
         {readings.length > 0 && (
           <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '1.5rem', marginBottom: '1.5rem' }}>
             <h2 style={{ color: '#fff', fontSize: '1rem', fontWeight: '600', margin: '0 0 1.2rem 0' }}>
@@ -380,10 +391,11 @@ export default function CentralPage() {
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e3a5f" />
                 <XAxis dataKey="hora" tick={{ fill: '#64748b', fontSize: 10 }} interval={3} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} domain={[0, 100]} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '0.75rem', color: '#94a3b8' }} />
-                <Line type="monotone" dataKey="Valor" stroke="#22c55e" strokeWidth={2} dot={false} name="Valor" />
+                <Line type="monotone" dataKey="MQ-135" stroke="#22c55e" strokeWidth={2} dot={false} name="MQ-135 (%)" connectNulls />
+                <Line type="monotone" dataKey="SW-420" stroke="#3b82f6" strokeWidth={2} dot={false} name="SW-420 (%)" connectNulls />
               </LineChart>
             </ResponsiveContainer>
 

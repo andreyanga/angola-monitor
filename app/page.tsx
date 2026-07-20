@@ -91,6 +91,8 @@ export default function Home() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [systemStatus, setSystemStatus] = useState<any>(null)
   const [recentLogs, setRecentLogs] = useState<any[]>([])
+  const [prediction, setPrediction] = useState<any>(null)
+  const [loadingPrediction, setLoadingPrediction] = useState(false)
 
   useEffect(() => {
     function updateClock() {
@@ -253,6 +255,24 @@ async function fetchSensors() {
 
   const w = selectedProvince ? getProvinceWeather(selectedProvince) : null
   const selectedRisk = w ? getProvinceRisk(w.province_id) : null
+
+  // Buscar predição da IA quando a província seleccionada muda
+  useEffect(() => {
+    async function fetchPrediction() {
+      if (!w?.province_id) { setPrediction(null); return }
+      setLoadingPrediction(true)
+      try {
+        const res = await fetch(`/api/predict?province_id=${w.province_id}`)
+        const data = await res.json()
+        setPrediction(data.error ? null : data)
+      } catch {
+        setPrediction(null)
+      } finally {
+        setLoadingPrediction(false)
+      }
+    }
+    fetchPrediction()
+  }, [w?.province_id])
 
   const getApiStatus = () => {
     if (!lastUpdate) return { color: '#64748b', label: 'A verificar...', dot: '#64748b' }
@@ -876,6 +896,38 @@ async function fetchSensors() {
                     {w.description}
                   </p>
                 </div>
+
+                {/* PREVISÃO — regressão sobre histórico + interpretação por IA */}
+                {loadingPrediction ? (
+                  <div style={{ background: '#0f172a', borderRadius: '10px', padding: '0.8rem', marginBottom: '0.8rem', textAlign: 'center' }}>
+                    <p style={{ color: '#475569', fontSize: '0.75rem', margin: 0 }}>A calcular previsão...</p>
+                  </div>
+                ) : prediction?.ia ? (
+                  <div style={{
+                    background: '#0f172a', borderRadius: '10px', padding: '0.8rem', marginBottom: '0.8rem',
+                    border: `1px solid ${prediction.ia.risco_previsto === 'Alto' ? '#ef444444' : prediction.ia.risco_previsto === 'Moderado' ? '#eab30844' : '#22c55e33'}`
+                  }}>
+                    <p style={{ color: '#64748b', fontSize: '0.6rem', textTransform: 'uppercase', margin: '0 0 0.4rem 0', letterSpacing: '0.05em' }}>
+                      🔮 Previsão — Próximas 3h
+                    </p>
+                    <p style={{ color: '#cbd5e1', fontSize: '0.75rem', lineHeight: '1.5', margin: '0 0 0.6rem 0' }}>
+                      {prediction.ia.previsao_texto}
+                    </p>
+                    <span style={{
+                      color: prediction.ia.risco_previsto === 'Alto' ? '#ef4444' : prediction.ia.risco_previsto === 'Moderado' ? '#eab308' : '#22c55e',
+                      fontSize: '0.65rem', fontWeight: '700',
+                      background: prediction.ia.risco_previsto === 'Alto' ? '#ef444422' : prediction.ia.risco_previsto === 'Moderado' ? '#eab30822' : '#22c55e22',
+                      padding: '0.15rem 0.5rem', borderRadius: '10px'
+                    }}>
+                      Risco previsto: {prediction.ia.risco_previsto}
+                    </span>
+                    {prediction.ia.alerta_preventivo && (
+                      <p style={{ color: '#eab308', fontSize: '0.7rem', margin: '0.5rem 0 0 0' }}>
+                        ⚠️ {prediction.ia.alerta_preventivo}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
 
                 <button
                   onClick={() => {
